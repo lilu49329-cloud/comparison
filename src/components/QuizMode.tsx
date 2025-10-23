@@ -89,7 +89,7 @@ export function QuizMode({
     "flex flex-col items-center gap-4 bg-linear-to-br from-purple-50 to-pink-50 rounded-3xl p-8 shadow-lg border-4 border-white min-h-48 justify-center w-full";
 
   return (
-    <div className="flex flex-col items-center gap-8 w-full max-w-4xl mx-auto p-6">
+    <div className="quiz-mode flex flex-col items-center gap-8 w-full max-w-4xl mx-auto p-6">
       {/* Header */}
       <div className="text-center">
         <p className="text-gray-600">

@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 import { Card } from "./ui/card";
 import { Trophy, Timer, Target, RotateCcw } from "lucide-react";
+import { FaBars } from "react-icons/fa6";
 
 interface CountingGameProps {
   difficulty?: Difficulty;
@@ -136,6 +137,12 @@ export function CountingGame({
 
   // Menu Screen
   if (gameState === "menu") {
+    const handleClick = () => {
+      const settingMenu = document.querySelector(".setting-card");
+      if (settingMenu) {
+        settingMenu.classList.toggle("show");
+      }
+    };
     return (
       <div className="flex flex-col items-center justify-center gap-8 p-8 min-h-screen bg-linear-to-br from-blue-100 via-purple-100 to-pink-100">
         <div className="text-center">
@@ -147,7 +154,9 @@ export function CountingGame({
           </p>
         </div>
 
-        <Card className="p-10 bg-white shadow-xl max-w-lg w-2">
+        <FaBars className="menu-mobi" onClick={handleClick} />
+
+        <Card className="p-10 bg-white shadow-xl max-w-lg w-4 main-card">
           <div className="flex flex-col gap-6">
             <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl">
               <Target className="w-8 h-8 text-blue-500 shrink-0" />

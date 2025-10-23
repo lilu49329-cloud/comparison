@@ -1784,3 +1784,59 @@ html {
   syntax: "*";
   inherits: false;
 }
+
+/* Responsive */
+.menu-mobi {
+  display: none;
+}
+
+.delete-card {
+  font-size: 30px;
+  color: var(--color-red-500);
+  position: absolute;
+  top: -10px;
+  right: 0;
+}
+
+.setting-card.show {
+  display: block;
+}
+
+@media (max-width: 1199.98px) {
+  h1 {
+    font-size: 36px;
+  }
+}
+
+@media (max-width: 991.98px) {
+  h1 {
+    font-size: 32px;
+  }
+
+  .setting-card {
+    display: none;
+  }
+
+  .main-card {
+    width: 70%;
+  }
+
+  .menu-mobi {
+    display: block;
+    font-size: 40px;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: var(--color-blue-600);
+  }
+}
+
+@media (max-width: 575.98px) {
+  h1 {
+    font-size: 24px;
+  }
+
+  .main-card {
+    width: 100%;
+  }
+}

@@ -3,6 +3,7 @@ import { CountingGame } from "./components/CountingGame";
 import { Difficulty, GameMode } from "./types/game";
 import { Button } from "./components/ui/button";
 import { Card } from "./components/ui/card";
+import { ImCancelCircle } from "react-icons/im";
 
 export default function App() {
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
@@ -15,11 +16,19 @@ export default function App() {
     setGameKey((prev) => prev + 1);
   };
 
+  const handleClick = () => {
+    const settingMenu = document.querySelector(".setting-card");
+    if (settingMenu) {
+      settingMenu.classList.toggle("show");
+    }
+  };
+
   return (
     <div className="size-full min-h-screen bg-linear-to-br from-blue-100 via-purple-100 to-pink-100">
       {/* Game Mode Selector */}
       <div className="fixed top-4 right-4 z-50">
-        <Card className="p-4 bg-white shadow-lg">
+        <Card className="p-4 bg-white shadow-lg setting-card">
+          <ImCancelCircle className="delete-card" onClick={handleClick} />
           <div className="flex flex-col gap-3">
             <div>
               <p className="text-sm text-gray-600 mb-2">Chế độ chơi:</p>
