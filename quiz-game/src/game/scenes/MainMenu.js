@@ -13,6 +13,8 @@ export default class MainMenu extends Phaser.Scene {
     this.load.image("btnSound", "assets/button/btn-sound.png");
     this.load.image("btnInfo", "assets/button/btn-info.png");
     this.load.image("btnTrophy", "assets/button/btn-trophy.png");
+
+    this.load.audio("click-sound", "assets/sounds/click.wav");
   }
 
   create() {
@@ -61,6 +63,7 @@ export default class MainMenu extends Phaser.Scene {
 
     // Khi nhấn nút: chuyển sang MapScene
     playBtn.on("pointerdown", () => {
+      this.sound.play("click-sound");
       this.tweens.add({
         targets: playBtn,
         scale: 0.18,
@@ -73,6 +76,7 @@ export default class MainMenu extends Phaser.Scene {
     });
 
     // Menu icon bên trái
+    // Danh sách icon (thêm btnSoundOff nếu bạn có sẵn ảnh)
     const icons = [
       { key: "btnStar", y: 140 },
       { key: "btnMenu", y: 230 },
@@ -81,13 +85,16 @@ export default class MainMenu extends Phaser.Scene {
       { key: "btnTrophy", y: 500 },
     ];
 
+    // Biến cục bộ giữ nút âm thanh
+    let soundBtn = null;
+
     icons.forEach((icon) => {
       const btn = this.add
         .image(80, icon.y, icon.key)
         .setInteractive({ useHandCursor: true })
         .setScale(0.3);
 
-      // Hiệu ứng hover nhỏ
+      // Hiệu ứng hover
       btn.on("pointerover", () =>
         this.tweens.add({ targets: btn, scale: 0.4, duration: 100 })
       );
@@ -95,10 +102,30 @@ export default class MainMenu extends Phaser.Scene {
         this.tweens.add({ targets: btn, scale: 0.3, duration: 100 })
       );
 
-      // Gắn sự kiện click (chưa có chức năng cụ thể)
-      btn.on("pointerdown", () => {
-        console.log(`${icon.key} clicked`);
-      });
+      // Nếu là nút âm thanh
+      if (icon.key === "btnSound") {
+        soundBtn = btn;
+
+        btn.on("pointerdown", () => {
+          // Chuyển trạng thái bật/tắt âm
+          this.game.sound.mute = !this.game.sound.mute;
+
+          // Nếu vừa bật lại thì phát click, nếu tắt thì im lặng
+          if (!this.game.sound.mute) {
+            this.sound.play("click-sound");
+          }
+
+          console.log(
+            `Âm thanh hiện đang ${this.game.sound.mute ? "TẮT" : "BẬT"}`
+          );
+        });
+      } else {
+        // Các nút còn lại: chỉ phát âm click + log
+        btn.on("pointerdown", () => {
+          if (!this.game.sound.mute) this.sound.play("click-sound");
+          console.log(`${icon.key} clicked`);
+        });
+      }
     });
   }
 }

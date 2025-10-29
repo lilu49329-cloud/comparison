@@ -19,6 +19,8 @@ export default class MapScene extends Phaser.Scene {
     this.load.image("truck", "assets/objects/truck.png");
     this.load.image("starfish", "assets/objects/starfish.png");
     this.load.image("ball", "assets/objects/ball.png");
+
+    this.load.audio("click-sound", "assets/sounds/click.wav");
   }
 
   create() {
@@ -51,6 +53,7 @@ export default class MapScene extends Phaser.Scene {
     );
 
     backBtn.on("pointerdown", () => {
+      this.sound.play("click-sound");
       this.scene.start("MainMenu");
     });
 
@@ -110,6 +113,7 @@ export default class MapScene extends Phaser.Scene {
         this.tweens.add({ targets: obj, scale: 0.45, duration: 100 });
       });
       obj.on("pointerdown", () => {
+        this.sound.play("click-sound");
         console.log("Vào màn:", lvl.stars);
         this.scene.start("GameScene", { level: lvl.stars });
       });

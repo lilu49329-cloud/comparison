@@ -28,6 +28,11 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("star", "assets/images/star.png");
     this.load.image("rabbit", "assets/images/rabbit.png");
     this.load.image("ballon", "assets/images/ballon.png");
+
+    this.load.audio("click-sound", "assets/sounds/click.wav");
+    this.load.audio("sound-correct", "assets/sounds/correct.wav");
+    this.load.audio("sound-wrong", "assets/sounds/wrong.wav");
+    this.load.audio("done", "assets/sounds/done.wav");
   }
 
   create(data) {
@@ -78,6 +83,7 @@ export default class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: backBtn, scale: 0.3, duration: 100 })
     );
     backBtn.on("pointerdown", () => {
+      this.sound.play("click-sound");
       this.cameras.main.fadeOut(300, 0, 0, 0);
       this.time.delayedCall(300, () => this.scene.start("MapScene"));
     });
@@ -234,7 +240,10 @@ export default class GameScene extends Phaser.Scene {
       btn.on("pointerout", () =>
         this.tweens.add({ targets: btn, scale: 0.25, duration: 100 })
       );
-      btn.on("pointerdown", () => this.handleAnswer(opt.isCorrect));
+      btn.on("pointerdown", () => {
+        this.handleAnswer(opt.isCorrect);
+        this.sound.play("click-sound");
+      });
 
       this.optionButtons.push(btn);
       this.optionTexts.push(txt);
@@ -264,6 +273,10 @@ export default class GameScene extends Phaser.Scene {
     });
 
     if (isCorrect) {
+      // Phát âm thanh đúng (nếu chưa mute)
+      if (!this.game.sound.mute)
+        this.sound.play("sound-correct", { volume: 0.8 });
+
       // Cập nhật tiến trình (sau khi đúng)
       const progress =
         ((this.currentQuestionIndex + 1) / this.levelData.questions.length) *
@@ -286,6 +299,10 @@ export default class GameScene extends Phaser.Scene {
         }
       });
     } else {
+      // Âm thanh sai
+      if (!this.game.sound.mute)
+        this.sound.play("sound-wrong", { volume: 0.8 });
+
       // Nếu sai → thêm hiệu ứng rung (shake)
       this.tweens.add({
         targets: this.questionContainer,
@@ -300,7 +317,7 @@ export default class GameScene extends Phaser.Scene {
   // Hoàn thành Level
   showLevelComplete() {
     const { width, height } = this.scale;
-
+    this.sound.play("done", { volume: 0.8 });
     // Ảnh chúc mừng hoàn thành
     const completeIcon = this.add
       .image(width / 2, height / 2, "level-complete")

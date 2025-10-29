@@ -8,9 +8,21 @@ export default class IntroScene extends Phaser.Scene {
   preload() {
     this.load.image("bg1", "assets/background/background-1.png");
     this.load.image("bg2", "assets/background/background-2.png");
+
+    this.load.audio("bg-music", "assets/sounds/bg-music.mp3");
   }
 
   create() {
+    this.music = this.sound.add("bg-music", {
+      loop: true,
+      volume: 0.3,
+    });
+
+    // Khi người chơi click lần đầu → phát nhạc
+    this.input.once("pointerdown", () => {
+      if (!this.music.isPlaying) this.music.play();
+    });
+
     // 🖼️ Tạo background 1
     const bg1 = this.add.image(0, 0, "bg1").setOrigin(0);
     const bg2 = this.add.image(0, 0, "bg2").setOrigin(0);
