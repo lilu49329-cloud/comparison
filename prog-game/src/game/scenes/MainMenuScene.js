@@ -79,7 +79,7 @@ export default class MainMenuScene extends Phaser.Scene {
     this.tweens.add({
       targets: [leafLeft, leafRight],
       angle: { from: -3, to: 3 },
-      duration: 3000,
+      duration: 2000,
       yoyo: true,
       repeat: -1,
       ease: "Sine.inOut",
@@ -153,11 +153,11 @@ export default class MainMenuScene extends Phaser.Scene {
 
     // Click -> Âm thanh + Fade out + Chuyển Scene
     playText.on("pointerdown", () => {
-      this.sound.play("click", { volume: 0.5 });
+      // this.sound.play("click", { volume: 0.5 });
       this.cameras.main.fadeOut(800, 0, 0, 0);
       this.cameras.main.once(
         Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
-        () => this.scene.start("PlayScene")
+        () => this.scene.start("MapScene")
       );
     });
 
