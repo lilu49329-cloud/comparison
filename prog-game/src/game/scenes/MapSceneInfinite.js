@@ -13,14 +13,29 @@ export default class MapSceneInfinite extends Phaser.Scene {
     this.load.image("background", "/assets/background/background.png");
     this.load.image("lotus", "/assets/ui/lotus.png");
     this.load.image("number1", "/assets/ui/number_1.png");
+    this.load.image("gameBg", "/assets/background/background.png");
+    //this.load.image("gameBg", "/assets/background/background1.webp");
+
     this.load.audio("so1", "/assets/audio/so1.mp3");
     this.load.audio("jump", "/assets/audio/jump.wav");
     this.load.audio("ring", "/assets/audio/ring.wav");
+    this.load.audio("bgMusic", "/assets/audio/bg_music.wav");
+    this.load.audio("intro", "/assets/audio/intro.mp3");
   }
 
   create() {
-    this.createSky();
-    this.createPond();
+    this.score = 0;
+    this.isJumping = false;
+    this.totalTargets = 15;
+    const { width, height } = this.scale;
+    this.bg = this.add
+      .tileSprite(0, 0, width, height, "gameBg")
+      .setOrigin(0)
+      .setDepth(-1)
+      .setScrollFactor(0);
+
+    // this.createSky();
+    // this.createPond();
     this.createFish();
     this.createProgressBar();
     this.createInstructions();
@@ -30,28 +45,43 @@ export default class MapSceneInfinite extends Phaser.Scene {
 
     // Camera theo ếch
     this.cameras.main.startFollow(this.frog, true, 0.05, 0.05);
+    this.cameras.main.setLerp(0.1, 0);
 
     // Gán sự kiện click lá sen
     this.lotuses.forEach((lotus, i) => {
       lotus.setInteractive({ useHandCursor: true });
       lotus.on("pointerdown", () => this.handleLotusClick(lotus, i));
     });
+
+    if (!this.sound.get("bgMusic")) {
+      const bgMusic = this.sound.add("bgMusic", { loop: true, volume: 0.3 });
+      bgMusic.play();
+    }
+
+    this.sound.play("intro");
   }
 
-  // Bầu trời
-  createSky() {
-    const { width } = this.scale;
-    const sky = this.add.graphics();
-    //sky.fillGradientStyle(0x5be05b, 0x4cb54c, 0x6be86b, 0x58c558, 1);
-    sky.fillRect(0, 0, width, 150);
+  update() {
+    if (this.bg) {
+      this.bg.tilePositionX = this.cameras.main.scrollX * 0.3;
+    }
+    this.cameras.main.scrollY = 0;
   }
 
-  // Mặt nước
-  createPond() {
-    const { width, height } = this.scale;
-    const pond = this.add.graphics();
-    pond.fillRect(0, 150, width, height);
-  }
+  // // Bầu trời
+  // createSky() {
+  //   const { width } = this.scale;
+  //   const sky = this.add.graphics();
+  //   //sky.fillGradientStyle(0x5be05b, 0x4cb54c, 0x6be86b, 0x58c558, 1);
+  //   sky.fillRect(0, 0, width, 150);
+  // }
+
+  // // Mặt nước
+  // createPond() {
+  //   const { width, height } = this.scale;
+  //   const pond = this.add.graphics();
+  //   pond.fillRect(0, 150, width, height);
+  // }
 
   // Cá bơi quanh camera
   createFish() {
@@ -172,12 +202,12 @@ export default class MapSceneInfinite extends Phaser.Scene {
   createInitialLotuses() {
     this.lotuses = [];
     const startX = 150;
-    const startY = 500;
+    const startY = this.scale.height / 2 + 50;
 
     for (let i = 0; i < 10; i++) {
       const lotus = this.spawnLotus(
         startX + i * 200,
-        startY + Phaser.Math.Between(-80, 80),
+        startY + Phaser.Math.Between(-20, 20),
         i === 0
       );
       this.lotuses.push(lotus);
@@ -188,7 +218,7 @@ export default class MapSceneInfinite extends Phaser.Scene {
   spawnLotus(x, y, isFirst = false) {
     const hasNumber = !isFirst && Phaser.Math.Between(0, 100) < 40;
 
-    const lotus = this.add.image(x, y, "lotus").setScale(0.12).setDepth(2);
+    const lotus = this.add.image(x, y, "lotus").setScale(0.12).setDepth(1);
     lotus.hasNumber = hasNumber;
     lotus.collected = false;
 
@@ -321,7 +351,7 @@ export default class MapSceneInfinite extends Phaser.Scene {
     const lastPad = this.lotuses[this.lotuses.length - 1];
     for (let i = 1; i <= 5; i++) {
       const newX = lastPad.x + i * 200;
-      const newY = Phaser.Math.Between(350, 520);
+      const newY = this.scale.height / 2 + 50 + Phaser.Math.Between(-20, 20);
       const newLotus = this.spawnLotus(newX, newY);
       this.lotuses.push(newLotus);
       newLotus.setInteractive({ useHandCursor: true });
@@ -367,6 +397,12 @@ export default class MapSceneInfinite extends Phaser.Scene {
   // Khi thắng
   winGame() {
     this.input.enabled = false;
+
+    this.sound.stopAll();
+
+    this.time.removeAllEvents();
+    this.tweens.killAll();
+
     this.cameras.main.fadeOut(1000, 0, 0, 0);
     this.time.delayedCall(1000, () => {
       this.scene.start("WinScene", { score: this.score });

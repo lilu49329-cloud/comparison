@@ -10,7 +10,7 @@ export default class WinScene extends Phaser.Scene {
 
     // Âm thanh chiến thắng
     this.load.audio("winSound", "/assets/audio/winner.wav");
-
+    this.load.audio("end", "/assets/audio/end.mp3");
     // (Tuỳ chọn) hình nền
     this.load.image("background", "/assets/background/background.png");
   }
@@ -23,11 +23,13 @@ export default class WinScene extends Phaser.Scene {
     bg.setDisplaySize(width, height);
 
     // Phát âm thanh chiến thắng
-    this.sound.play("winSound", { volume: 0.6 });
-
+    this.sound.play("winSound", {
+      volume: 0.1,
+    });
+    this.sound.play("end", { volume: 0.8 });
     // Hình ếch ăn mừng
     const frog = this.add
-      .image(width / 2, height / 2 - 80, "frogHappy")
+      .image(width / 2, height / 2 - 150, "frogHappy")
       .setScale(0.25)
       .setAlpha(0);
 
@@ -106,10 +108,10 @@ export default class WinScene extends Phaser.Scene {
       replayBtn.setStyle({ backgroundColor: "#4caf50" })
     );
     replayBtn.on("pointerdown", () => {
-      this.sound.play("so1", { volume: 0.5 });
       this.cameras.main.fadeOut(500, 0, 0, 0);
       this.time.delayedCall(500, () => {
-        this.scene.start("IntroScene");
+        this.scene.stop("MapSceneInfinite");
+        this.scene.start("MapSceneInfinite");
       });
     });
 

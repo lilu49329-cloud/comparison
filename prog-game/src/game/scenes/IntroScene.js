@@ -77,12 +77,10 @@ export default class IntroScene extends Phaser.Scene {
       );
     });
 
-    if (!this.sound.get("bgMusic")) {
-      this.bgMusic = this.sound.add("bgMusic", {
-        volume: 0.3,
-        loop: true,
-      });
-      this.bgMusic.play();
-    }
+    this.bgMusic = this.sound.add("bgMusic", {
+      volume: 0.3,
+      loop: true,
+    });
+    this.bgMusic.play();
   }
 }
