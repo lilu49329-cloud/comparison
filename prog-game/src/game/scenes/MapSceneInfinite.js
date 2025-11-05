@@ -13,7 +13,7 @@ export default class MapSceneInfinite extends Phaser.Scene {
     this.load.image("frog", "/assets/characters/image.png");
     this.load.image("lotus", "/assets/ui/lotus.png");
     this.load.image("number1", "/assets/ui/number_1.png");
-    this.load.image("gameBg", "/assets/background/background1.png");
+    this.load.image("gameBg", "/assets/background/background2.png");
 
     // Âm thanh
     this.load.audio("so1", "/assets/audio/so1.mp3");
