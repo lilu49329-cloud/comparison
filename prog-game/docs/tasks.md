@@ -22,3 +22,12 @@
 
 - [ ] Scale đúng trên các thiết bị khác nhau.
 - [x] Kết thúc game khi đủ 15 điểm.
+
+## Comment về game
+
+- [ ] Fix lỗi responsive cho frog game
+- [ ] Điều chỉnh lại hình ảnh, âm thanh
+- [ ] Build lại và tích hợp ghép code vào game hub
+- [ ] Mô tả đúng phương trình nhảy của con ếch và implement
+- [ ] Bổ sung sprite list cho trạng thái chuyển động và nhảy của ếch
+- [ ] Rẽ nhánh các lối đi
