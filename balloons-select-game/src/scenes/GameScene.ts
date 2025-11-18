@@ -26,6 +26,11 @@ export default class GameScene extends Phaser.Scene {
         this.load.image("balloon_green", "assets/images/balloon_green.png");
         this.load.image("balloon_purple", "assets/images/balloon_purple.png");
 
+        this.load.image("apple", "assets/images/apple.png");
+        this.load.image("flower", "assets/images/flower.png");
+        this.load.image("carrot", "assets/images/carrot.png");
+        this.load.image("leaf", "assets/images/leaf.png");
+
         // AUDIO
         // this.load.audio("vo_prompt_1", "assets/audio/vo_prompt_1.mp3");
         // this.load.audio("sfx_correct", "assets/audio/sfx_correct.mp3");
@@ -83,7 +88,7 @@ export default class GameScene extends Phaser.Scene {
 
             const img = this.add.image(0, 0, colorKey).setScale(0.8);
             const text = this.add.text(0, 0, String(num), {
-            fontSize: "60px",
+            fontSize: "100px",
             color: "#ffffff",
             fontStyle: "bold",
             }).setOrigin(0.5);
@@ -140,8 +145,89 @@ export default class GameScene extends Phaser.Scene {
             img.disableInteractive();
         });
 
-        // Chuyển sang giai đoạn 5 để xử lý hiệu ứng pop + rabbit cheer
-        console.log("Correct! Will animate in next stage.");
+        // Pop bóng đúng
+        const img = balloon.getAt(0) as Phaser.GameObjects.Image;
+        this.tweens.add({
+            targets: img,
+            scale: 0,
+            duration: 250,
+            ease: "Back.easeIn",
+            onComplete: () => {
+            // Optionally destroy container
+            balloon.destroy();
+            // this.sound.play("sfx_pop");
+            // 🟢 Hiển thị bảng số lượng sau pop
+            const items = ["apple", "flower", "carrot", "leaf"];
+            const itemKey = items[Math.floor(Math.random() * items.length)];
+            this.showNumberBoard(this.levelData.correctNumber, itemKey);
+            // this.showNumberBoard(this.levelData.correctNumber, "apple");
+            }
+        });
+
+        // Fly-away bóng sai
+        this.balloons.forEach(b => {
+            if (b !== balloon) {
+            const wrongImg = b.getAt(0) as Phaser.GameObjects.Image;
+            this.tweens.add({
+                targets: b,
+                y: b.y - 600,
+                alpha: 0,
+                duration: 2000,
+                ease: "Linear",
+                onComplete: () => b.destroy()
+            });
+            // this.sound.play("sfx_flyaway");
+            }
+        });
+
+        // Rabbit cheer
+        this.rabbit.setTexture("rabbit_cheer");
+
+        // Chờ 1.5s → chuyển màn
+        // this.time.delayedCall(1500, () => {
+        //     this.scene.start("NextScene");
+        // });
+    }
+
+    showNumberBoard(number: number, itemKey: string) {
+        // Bảng cố định
+        const boardWidth = 600;
+        const boardHeight = 400;
+        const boardX = 640;
+        const boardY = 400;
+
+        // Background bảng (sprite hoặc graphics)
+        const graphics = this.add.graphics();
+        graphics.fillStyle(0x8fcaff, 1); // màu xanh nhạt
+        graphics.fillRoundedRect(boardX - boardWidth / 2, boardY - boardHeight / 2, boardWidth, boardHeight, 20);
+
+        // Sắp xếp các item 200x200
+        const itemSize = 200;
+        const padding = 20; // khoảng cách giữa item
+
+        let itemsPerRow = 1;
+        if (number >= 3) itemsPerRow = 2; // 1 hàng nếu 1-2, 2 hàng nếu 3-4
+        const numRows = Math.ceil(number / itemsPerRow);
+
+        // Tính startX, startY để căn giữa bảng
+        const totalWidth = itemsPerRow * itemSize + (itemsPerRow - 1) * padding;
+        const totalHeight = numRows * itemSize + (numRows - 1) * padding;
+
+        const startX = boardX - totalWidth / 2 + itemSize / 2;
+        const startY = boardY - totalHeight / 2 + itemSize / 2;
+
+        for (let i = 0; i < number; i++) {
+            const row = Math.floor(i / itemsPerRow);
+            const col = i % itemsPerRow;
+
+            const x = startX + col * (itemSize + padding);
+            const y = startY + row * (itemSize + padding);
+
+            this.add.image(x, y, itemKey).setDisplaySize(itemSize, itemSize);
+        }
+
+        // **Cập nhật banner trên cùng**
+        this.promptText.setText(`${number}`);
     }
 
 
