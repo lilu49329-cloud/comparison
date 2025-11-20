@@ -8,10 +8,15 @@ const config: Phaser.Types.Core.GameConfig = {
     height: 720,
     parent: 'game-container',
     scene: [GameScene, EndScene],
-    backgroundColor: '#87ceeb',
+    backgroundColor: '#ffffff',
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
+    },
+    render: {
+        pixelArt: false,
+        antialias: true,
+        transparent: true,
     },
 };
 

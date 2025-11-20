@@ -68,7 +68,6 @@ export default class GameScene extends Phaser.Scene {
 
     preload() {
         // IMAGES
-        this.load.image('bg_forest', '/assets/images/bg_forest.png');
         this.load.image('rabbit_idle', '/assets/images/rabbit_idle.png');
         this.load.image('rabbit_cheer', '/assets/images/rabbit_cheer.png');
         this.load.image('banner_top', '/assets/images/banner_top.png');
@@ -77,6 +76,26 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('balloon_blue', 'assets/images/balloon_blue.png');
         this.load.image('balloon_green', 'assets/images/balloon_green.png');
         this.load.image('balloon_purple', 'assets/images/balloon_purple.png');
+
+        this.load.spritesheet('pop_red', 'assets/images/pop_red.png', {
+            frameWidth: 256,
+            frameHeight: 256,
+        });
+
+        this.load.spritesheet('pop_blue', 'assets/images/pop_blue.png', {
+            frameWidth: 256,
+            frameHeight: 256,
+        });
+
+        this.load.spritesheet('pop_green', 'assets/images/pop_green.png', {
+            frameWidth: 256,
+            frameHeight: 256,
+        });
+
+        this.load.spritesheet('pop_purple', 'assets/images/pop_purple.png', {
+            frameWidth: 256,
+            frameHeight: 256,
+        });
 
         this.load.image('apple', 'assets/images/apple.png');
         this.load.image('flower', 'assets/images/flower.png');
@@ -94,7 +113,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('sfx_correct', 'assets/audio/sfx_correct.wav');
         this.load.audio('sfx_wrong', 'assets/audio/sfx_wrong.wav');
         this.load.audio('sfx_click', 'assets/audio/sfx_click.wav');
-        // this.load.audio("sfx_pop", "assets/audio/sfx_pop.mp3");
+        this.load.audio('sfx_pop', 'assets/audio/sfx_pop.wav');
         // this.load.audio("sfx_flyaway", "assets/audio/sfx_flyaway.mp3");
 
         this.load.audio('vo_count_1', 'assets/audio/vo_count_1.mp3');
@@ -104,32 +123,10 @@ export default class GameScene extends Phaser.Scene {
     }
 
     create() {
-        // // Background
-        // this.add.image(640, 360, "bg_forest").setOrigin(0.5);
-
-        // // Rabbit (nhân vật)
-        // this.rabbit = this.add.image(200, 500, "rabbit_idle").setScale(0.8);
-
-        // // Banner top
-        // this.add.image(640, 120, "banner_top").setScale(0.9);
-
-        // // Text hướng dẫn
-        // this.promptText = this.add.text(640, 70, "Chạm vào số X", {
-        //     fontSize: "48px",
-        //     fontFamily: "Arial",
-        //     color: "#ffffff",
-        // }).setOrigin(0.5);
-
-        // this.promptText.setText(this.getPromptText());
-
         const w = this.getW();
         const h = this.getH();
 
-        // background: căn giữa
-        this.add
-            .image(this.pctX(0.5), this.pctY(0.5), 'bg_forest')
-            .setDisplaySize(w, h) // stretch background để phủ canvas (hoặc setScale phù hợp)
-            .setOrigin(0.5);
+        this.balloons = []; // reset balloons
 
         // rabbit: đặt theo tỉ lệ
         this.rabbit = this.add.image(
@@ -161,6 +158,23 @@ export default class GameScene extends Phaser.Scene {
         this.playPromptAudio();
 
         this.createBalloons();
+
+        const colors = ['red', 'blue', 'green', 'purple'];
+
+        colors.forEach((color) => {
+            const key = `pop_${color}_anim`;
+
+            // Quan trọng: tránh tạo lại gây xung đột key
+            if (!this.anims.exists(key)) {
+                this.anims.create({
+                    key: key,
+                    frames: this.anims.generateFrameNumbers(`pop_${color}`),
+                    frameRate: 20,
+                    hideOnComplete: true,
+                    repeat: 0,
+                });
+            }
+        });
     }
 
     createBalloons() {
@@ -195,6 +209,16 @@ export default class GameScene extends Phaser.Scene {
             const img = this.add
                 .image(0, 0, shuffledColors[index])
                 .setDisplaySize(baseSize, baseSize);
+
+            const balloonKey = shuffledColors[index]; // balloon_red
+            const popKey = balloonKey.replace('balloon_', 'pop_'); // pop_red
+
+            img.setData('balloonKey', balloonKey);
+            img.setData('popKey', popKey);
+
+            (balloon as any).popKey = popKey;
+            (balloon as any).balloonKey = balloonKey;
+
             const text = this.add
                 .text(0, 0, String(num), {
                     fontSize: `${Math.round(baseSize * 0.45)}px`,
@@ -205,6 +229,7 @@ export default class GameScene extends Phaser.Scene {
 
             balloon.add([img, text]);
             (balloon as any).value = num;
+            // (balloon as any).color = color;
 
             img.setInteractive({ useHandCursor: true });
             img.on('pointerdown', () => this.handleSelect(balloon));
@@ -265,94 +290,88 @@ export default class GameScene extends Phaser.Scene {
         const w = this.scale.width;
         const h = this.scale.height;
 
-        // --- Disable toàn bộ bóng ---
-        if (this.balloons && this.balloons.length > 0) {
-            this.balloons.forEach((b) => {
-                const img = b.getAt(0) as Phaser.GameObjects.Image;
-                if (img) img.disableInteractive();
-            });
-        }
+        // đánh dấu bóng đúng
+        (balloon as any).isCorrect = true;
 
-        // --- Pop bóng đúng ---
         const img = balloon.getAt(0) as Phaser.GameObjects.Image;
-
-        // Tỉ lệ phóng to theo kích thước canvas
         const baseScale = (Math.min(w, h) / 1280) * 2;
 
         this.tweens.add({
             targets: img,
-            // x: w / 2,
-            // y: h / 2,
             scaleX: baseScale,
             scaleY: baseScale,
-            duration: 1000,
+            duration: 3000,
             ease: 'Power2',
             onComplete: () => {
                 balloon.destroy();
 
-                // Hiển thị bảng số lượng sau pop (responsive)
+                // chọn 1 item random
                 const items = ['apple', 'flower', 'carrot', 'leaf'];
                 const itemKey = items[Math.floor(Math.random() * items.length)];
-                this.showNumberBoard(
+
+                // 🟢 Nhận tổng thời gian đọc số
+                const waitTime = this.showNumberBoard(
                     this.levelData.correctNumber,
                     itemKey,
                     'board_bg'
                 );
+
+                // 🟢 Chờ đọc xong rồi mới hiện Next
+                this.time.delayedCall(waitTime, () => {
+                    this.showNextButton();
+                });
             },
         });
 
-        // --- Fly-away bóng sai ---
-        this.balloons.forEach((b) => {
-            if (b !== balloon) {
-                this.tweens.add({
-                    targets: b,
-                    y: b.y - h * 0.8, // bay lên 80% chiều cao màn hình
-                    alpha: 0,
-                    duration: 2000,
-                    ease: 'Linear',
-                    onComplete: () => b.destroy(),
+        // ------- Animation bóng sai: nổ -------
+        this.balloons.forEach((b, index) => {
+            if ((b as any).isCorrect) return; // không nổ bóng đúng
+
+            const imgB = b.getAt(0) as Phaser.GameObjects.Image;
+            const popKey = imgB.getData('popKey'); // đúng theo từng màu
+
+            // b.setVisible(false);
+
+            const pop = this.add
+                .image(b.x, b.y, popKey)
+                .setDisplaySize(
+                    (Math.min(w, h) / 1280) * 150,
+                    (Math.min(w, h) / 1280) * 150
+                )
+                .setAlpha(0);
+
+            this.time.delayedCall(300, () => {
+                // Delay tăng dần theo index → nổ lần lượt
+                this.time.delayedCall(index * 500, () => {
+                    b.destroy();
+
+                    // 500ms giữa các bóng
+                    this.tweens.add({
+                        targets: pop,
+                        alpha: 1,
+                        scaleX: 1.3,
+                        scaleY: 1.3,
+                        duration: 500,
+                        ease: 'Quad.easeOut',
+                        onComplete: () => {
+                            this.tweens.add({
+                                targets: pop,
+                                alpha: 0,
+                                duration: 250,
+                                onComplete: () => {
+                                    pop.destroy();
+                                    // b.destroy();
+                                },
+                            });
+                            this.sound.play('sfx_pop');
+                        },
+                    });
                 });
-            }
-        });
-
-        // --- Rabbit cheer ---
-        this.rabbit.setTexture('rabbit_cheer').setScale(1.2);
-
-        // --- Nút next responsive ---
-        const offset = Math.min(w, h) * 0.1; // cách mép 10% của chiều nhỏ nhất
-        const btnScale = (Math.min(w, h) / 1280) * 1;
-
-        const nextButton = this.add
-            .image(w - offset, h - offset, 'icon_next')
-            .setInteractive({ useHandCursor: true })
-            .setScale(btnScale)
-            .setOrigin(1) // căn bottom-right
-            .setAlpha(0);
-
-        // Hiển thị nút
-        nextButton.setAlpha(1);
-
-        // Tween nhấp nhô
-        this.tweens.add({
-            targets: nextButton,
-            scale: btnScale * 1.1,
-            yoyo: true,
-            repeat: -1,
-            duration: 500,
-        });
-
-        // Nhấn nút next
-        nextButton.once('pointerdown', () => {
-            this.sound.play('sfx_click');
-            this.time.delayedCall(1000, () => {
-                this.currentLevel++;
-                if (this.currentLevel >= this.levels.length) {
-                    this.scene.start('EndScene');
-                } else {
-                    this.scene.restart({ level: this.currentLevel });
-                }
             });
         });
+
+        // rabbit cheer
+        this.rabbit.setTexture('rabbit_cheer').setScale(1.2);
     }
 
     showNumberBoard(number: number, itemKey: string, boardBgKey?: string) {
@@ -365,6 +384,9 @@ export default class GameScene extends Phaser.Scene {
         const boardHeight = h * 0.55;
         const boardX = w / 2;
         const boardY = h / 1.8;
+
+        const delayPerItem = 500;
+        const voiceDuration = 600; // ước lượng
 
         // Background bảng (sprite hoặc graphics)
         if (boardBgKey) {
@@ -427,5 +449,46 @@ export default class GameScene extends Phaser.Scene {
 
         // **Cập nhật banner trên cùng** (hiển thị số)
         this.promptText.setText(`${number}`);
+
+        const totalTime = number * delayPerItem + voiceDuration;
+        return totalTime;
+    }
+
+    showNextButton() {
+        const w = this.scale.width;
+        const h = this.scale.height;
+
+        const offset = Math.min(w, h) * 0.1;
+        const btnScale = Math.min(w, h) / 1280;
+
+        const nextButton = this.add
+            .image(w - offset, h - offset, 'icon_next')
+            .setInteractive({ useHandCursor: true })
+            .setScale(btnScale)
+            .setOrigin(1)
+            .setAlpha(0);
+
+        nextButton.setAlpha(1);
+
+        this.tweens.add({
+            targets: nextButton,
+            scale: btnScale * 1.1,
+            yoyo: true,
+            repeat: -1,
+            duration: 500,
+        });
+
+        nextButton.once('pointerdown', () => {
+            this.sound.play('sfx_click');
+
+            this.time.delayedCall(1000, () => {
+                this.currentLevel++;
+                if (this.currentLevel >= this.levels.length) {
+                    this.scene.start('EndScene');
+                } else {
+                    this.scene.restart({ level: this.currentLevel });
+                }
+            });
+        });
     }
 }
