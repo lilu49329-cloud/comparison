@@ -35,6 +35,8 @@ canvas {
     background: rgba(0, 0, 0, 0.8);
     color: #fff;
     font-size: 2em;
+    font-family: 'sv-dumlings', sans-serif;
+    font-weight: bold;
     text-align: center;
     padding-top: 40%;
     z-index: 9999;

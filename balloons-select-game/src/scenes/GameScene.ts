@@ -73,23 +73,23 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('balloon_purple', 'assets/images/balloon_purple.png');
 
         this.load.spritesheet('pop_red', 'assets/images/pop_red.png', {
-            frameWidth: 256,
-            frameHeight: 256,
+            frameWidth: 1024,
+            frameHeight: 1829,
         });
 
         this.load.spritesheet('pop_blue', 'assets/images/pop_blue.png', {
-            frameWidth: 256,
-            frameHeight: 256,
+            frameWidth: 1024,
+            frameHeight: 1829,
         });
 
         this.load.spritesheet('pop_green', 'assets/images/pop_green.png', {
-            frameWidth: 256,
-            frameHeight: 256,
+            frameWidth: 1024,
+            frameHeight: 1698,
         });
 
         this.load.spritesheet('pop_purple', 'assets/images/pop_purple.png', {
-            frameWidth: 256,
-            frameHeight: 256,
+            frameWidth: 1024,
+            frameHeight: 1829,
         });
 
         this.load.image('apple', 'assets/images/apple.png');
@@ -109,7 +109,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('sfx_wrong', 'assets/audio/sfx_wrong.wav');
         this.load.audio('sfx_click', 'assets/audio/sfx_click.wav');
         this.load.audio('sfx_pop', 'assets/audio/sfx_pop.wav');
-        // this.load.audio("sfx_flyaway", "assets/audio/sfx_flyaway.mp3");
+        this.load.audio('correct_answer', 'assets/audio/correct_answer.mp3');
 
         this.load.audio('vo_count_1', 'assets/audio/vo_count_1.mp3');
         this.load.audio('vo_count_2', 'assets/audio/vo_count_2.mp3');
@@ -126,11 +126,11 @@ export default class GameScene extends Phaser.Scene {
         // rabbit: đặt theo tỉ lệ
         this.rabbit = this.add.image(
             this.pctX(0.15),
-            this.pctY(0.75),
+            this.pctY(0.7),
             'rabbit_idle'
         );
         // scale rabbit theo kích thước màn: ví dụ 12% chiều cao
-        this.rabbit.setDisplaySize(this.getH() * 0.7, this.getH() * 0.7);
+        this.rabbit.setDisplaySize(this.getH() * 0.5, this.getH() * 0.75);
 
         // banner top
         this.banner = this.add.image(
@@ -161,12 +161,16 @@ export default class GameScene extends Phaser.Scene {
 
         colors.forEach((color) => {
             const key = `pop_${color}_anim`;
+            // const sheet = `pop_${color}`;
 
             // Quan trọng: tránh tạo lại gây xung đột key
             if (!this.anims.exists(key)) {
                 this.anims.create({
                     key: key,
-                    frames: this.anims.generateFrameNumbers(`pop_${color}`),
+                    frames: this.anims.generateFrameNumbers(`pop_${color}`, {
+                        start: 0,
+                        end: 4,
+                    }),
                     frameRate: 20,
                     hideOnComplete: true,
                     repeat: 0,
@@ -289,6 +293,7 @@ export default class GameScene extends Phaser.Scene {
         (this as any).isProcessing = true;
 
         this.sound.play('sfx_correct');
+        this.sound.play('correct_answer');
 
         const w = this.scale.width;
         const h = this.scale.height;
@@ -308,6 +313,7 @@ export default class GameScene extends Phaser.Scene {
         // 1) ĐƯA BÓNG ĐÚNG LÊN TRƯỚC TẤT CẢ
         // ================================
         this.children.bringToTop(balloon);
+        balloon.setDepth(9999);
 
         // ================================
         // 2) Tween bóng đúng → bay vào giữa
@@ -317,8 +323,8 @@ export default class GameScene extends Phaser.Scene {
             targets: balloon,
             x: w / 2,
             y: h / 2,
-            scaleX: 1.4,
-            scaleY: 1.4,
+            scaleX: 1.5,
+            scaleY: 1.5,
             duration: 600,
             ease: 'Back.Out',
         });
@@ -336,8 +342,8 @@ export default class GameScene extends Phaser.Scene {
         // Tăng scale chữ số
         this.tweens.add({
             targets: balloonText,
-            scaleX: 1.4,
-            scaleY: 1.4,
+            scaleX: 1.5,
+            scaleY: 1.5,
             duration: 1500,
             delay: 300,
             ease: 'Quad.easeOut',
@@ -350,70 +356,122 @@ export default class GameScene extends Phaser.Scene {
         this.balloons.forEach((b, index) => {
             if ((b as any).isCorrect) return; // bỏ bóng đúng
 
-            const imgB = b.getAt(0) as Phaser.GameObjects.Image;
-            const popKey = imgB.getData('popKey');
+            // const imgB = b.getAt(0) as Phaser.GameObjects.Image;
+            // const popKey = imgB.getData('popKey');
+            const popKey = (b as any).popKey;
 
             // Tạo sprite nổ
+            // const pop = this.add
+            //     .image(b.x, b.y, popKey)
+            //     .setDisplaySize(
+            //         (Math.min(w, h) / 1280) * 150,
+            //         (Math.min(w, h) / 1280) * 150
+            //     )
+            //     .setAlpha(0);
+
+            // ⭐ Tạo sprite animation
             const pop = this.add
-                .image(b.x, b.y, popKey)
-                .setDisplaySize(
-                    (Math.min(w, h) / 1280) * 150,
-                    (Math.min(w, h) / 1280) * 150
-                )
-                .setAlpha(0);
+                .sprite(b.x, b.y, popKey)
+                .setScale((Math.min(w, h) / 1280) * 0.8)
+                .setAlpha(0)
+                .setDepth(9000); // cho lên trên
 
             // Hẹn giờ nổ lần lượt
             this.time.delayedCall(500 + index * 500, () => {
-                this.tweens.add({
-                    targets: pop,
-                    alpha: 1,
-                    scaleX: 1.3,
-                    scaleY: 1.3,
-                    duration: 500,
-                    ease: 'Quad.easeOut',
-                    onStart: () => {
-                        this.sound.play('sfx_pop');
-                        b.destroy();
-                    },
-                    onComplete: () => {
-                        poppedCount++;
+                // this.tweens.add({
+                //     targets: pop,
+                //     alpha: 1,
+                //     scaleX: 1.3,
+                //     scaleY: 1.3,
+                //     duration: 500,
+                //     ease: 'Quad.easeOut',
+                //     onStart: () => {
+                //         this.sound.play('sfx_pop');
+                //         b.destroy();
+                //     },
+                //     onComplete: () => {
+                //         poppedCount++;
 
-                        // Sau khi pop hiện xong thì fade-out
-                        this.tweens.add({
-                            targets: pop,
-                            alpha: 0,
-                            duration: 250,
-                            onComplete: () => pop.destroy(),
-                        });
+                //         // Sau khi pop hiện xong thì fade-out
+                //         this.tweens.add({
+                //             targets: pop,
+                //             alpha: 0,
+                //             duration: 250,
+                //             onComplete: () => pop.destroy(),
+                //         });
 
-                        // ⭕ Nếu tất cả bóng sai đã nổ xong
-                        if (poppedCount === totalWrong) {
-                            // Destroy bóng đúng
-                            balloon.destroy();
+                // trả pop lên visible
+                pop.setAlpha(1);
 
-                            // Chọn item random
-                            const items = ['apple', 'flower', 'carrot', 'leaf'];
-                            const itemKey =
-                                items[Math.floor(Math.random() * items.length)];
+                // chơi animation
+                pop.play(`${popKey}_anim`);
 
-                            // Hiện bảng số
-                            const waitTime = this.showNumberBoard(
-                                this.levelData.correctNumber,
-                                itemKey,
-                                'board_bg'
-                            );
+                // play sound
+                this.sound.play('sfx_pop');
 
-                            // Chờ đọc xong rồi hiện next
-                            this.time.delayedCall(waitTime, () => {
-                                this.showNextButton();
-                            });
-                        }
-                    },
+                // xóa bóng sai
+                b.destroy();
+
+                // đếm bóng nổ
+                poppedCount++;
+
+                // khi nổ xong tự ẩn sprite (vì hideOnComplete = true)
+                pop.on('animationcomplete', () => {
+                    pop.destroy();
                 });
+
+                // ⭕ Nếu tất cả bóng sai đã nổ xong
+                if (poppedCount === totalWrong) {
+                    this.time.delayedCall(500, () => {
+                        // Hiệu ứng thu nhỏ rồi biến mất
+                        this.tweens.add({
+                            targets: balloon,
+                            scaleX: 0,
+                            scaleY: 0,
+                            alpha: 0,
+                            duration: 400,
+                            ease: 'Back.In',
+                            onComplete: () => {
+                                balloon.destroy();
+
+                                //delay 300ms rồi hiện bảng số
+                                this.time.delayedCall(300, () => {
+                                    // Chọn item random
+                                    const items = [
+                                        'apple',
+                                        'flower',
+                                        'carrot',
+                                        'leaf',
+                                    ];
+                                    const itemKey =
+                                        items[
+                                            Math.floor(
+                                                Math.random() * items.length
+                                            )
+                                        ];
+
+                                    // Hiện bảng số
+                                    const waitTime = this.showNumberBoard(
+                                        this.levelData.correctNumber,
+                                        itemKey,
+                                        'board_bg'
+                                    );
+
+                                    // Chờ đọc xong rồi hiện next
+                                    this.time.delayedCall(waitTime, () => {
+                                        this.showNextButton();
+                                    });
+                                });
+                            },
+                        });
+                    });
+                }
+                //     },
+                // });
             });
         });
 
-        this.rabbit.setTexture('rabbit_cheer').setScale(1.2);
+        this.rabbit.setTexture('rabbit_cheer').setScale(1.15);
     }
 
     showNumberBoard(number: number, itemKey: string, boardBgKey?: string) {
