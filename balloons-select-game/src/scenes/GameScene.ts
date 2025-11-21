@@ -5,13 +5,6 @@ interface LevelData {
     options: number[];
 }
 
-const levels: LevelData[] = [
-    { correctNumber: 1, options: [1, 2, 3, 4] },
-    { correctNumber: 2, options: [1, 2, 3, 4] },
-    { correctNumber: 3, options: [1, 2, 3, 4] },
-    { correctNumber: 4, options: [1, 2, 3, 4] },
-];
-
 export default class GameScene extends Phaser.Scene {
     rabbit!: Phaser.GameObjects.Image;
     promptText!: Phaser.GameObjects.Text;
@@ -47,6 +40,7 @@ export default class GameScene extends Phaser.Scene {
     // ⭐ Giữ level khi restart
     init(data: any) {
         this.currentLevel = data?.level ?? 0;
+        (this as any).isProcessing = false;
     }
 
     get levelData() {
@@ -285,6 +279,10 @@ export default class GameScene extends Phaser.Scene {
     }
 
     onCorrect(balloon: Phaser.GameObjects.Container) {
+        // Nếu đang xử lý rồi thì return
+        if ((this as any).isProcessing) return;
+        (this as any).isProcessing = true;
+
         this.sound.play('sfx_correct');
 
         const w = this.scale.width;
@@ -292,6 +290,9 @@ export default class GameScene extends Phaser.Scene {
 
         // đánh dấu bóng đúng
         (balloon as any).isCorrect = true;
+
+        // Disable tất cả bóng để tránh nhấn liên tục
+        this.balloons.forEach((b) => b.disableInteractive());
 
         const img = balloon.getAt(0) as Phaser.GameObjects.Image;
         const baseScale = (Math.min(w, h) / 1280) * 2;
