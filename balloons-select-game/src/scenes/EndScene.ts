@@ -5,50 +5,62 @@ export class EndScene extends Phaser.Scene {
         super({ key: 'EndScene' });
     }
 
-    create() {
-        const { width, height } = this.cameras.main;
-
-        // Banner "Kết thúc"
-        const banner = this.add
-            .text(width / 2, 200, 'Chúc mừng bé!', {
-                fontSize: '90px',
-                fontFamily: 'Arial',
-                color: '#ffffff',
-                fontStyle: 'bold',
-            })
-            .setOrigin(0.5);
+    preload() {
+        // Banner chúc mừng (có chữ sẵn)
+        this.load.image('banner_congrat', 'assets/images/banner_congrat.png');
 
         // Nút chơi lại
-        const replayBtn = this.add
-            .text(width / 2, height / 2, 'Chơi lại', {
-                fontSize: '58px',
-                fontFamily: 'Arial',
-                color: '#ffffff',
-                backgroundColor: '#ff6b6b',
-                padding: { left: 20, right: 20, top: 10, bottom: 10 },
-            })
+        this.load.image('btn_reset', 'assets/images/btn_reset.png');
+
+        // Nút thoát
+        this.load.image('btn_exit', 'assets/images/btn_exit.png');
+
+        // Âm thanh click
+        this.load.audio('sfx_click', 'assets/audio/sfx_click.wav');
+    }
+
+    create() {
+        const w = this.scale.width;
+        const h = this.scale.height;
+
+        // ==== Banner ảnh chúc mừng ====
+        const banner = this.add
+            .image(w / 2, h / 2 - 100, 'banner_congrat') // banner_congrat là key của ảnh
             .setOrigin(0.5)
+            .setDisplaySize(w * 1, h * 1); // scale theo màn hình
+
+        // ==== Các nút ngang dưới banner ====
+        const btnScale = Math.min(w, h) / 1280; // tỉ lệ nút
+        const spacing = 250 * btnScale; // khoảng cách giữa 2 nút
+
+        // Nút Chơi lại
+        const replayBtn = this.add
+            .image(w / 2 - spacing, h / 2 + h * 0.2, 'btn_reset')
+            .setOrigin(0.5)
+            .setScale(btnScale)
             .setInteractive({ useHandCursor: true });
 
-        // Hover effect
-        replayBtn.on('pointerover', () =>
-            replayBtn.setStyle({ backgroundColor: '#ff8787' })
-        );
-        replayBtn.on('pointerout', () =>
-            replayBtn.setStyle({ backgroundColor: '#ff6b6b' })
-        );
-
-        // Click: restart game
         replayBtn.on('pointerdown', () => {
-            this.scene.start('GameScene', {
-                levelData: {
-                    correctNumber: Phaser.Math.Between(1, 4),
-                    options: [1, 2, 3, 4], // hoặc generate lại
-                },
-            });
+            this.sound.play('sfx_click');
+            this.scene.start('GameScene', { level: 0 });
         });
 
-        // Thêm âm thanh khi hover/click nếu muốn
-        // this.sound.play('sfx_click');
+        // Nút Thoát
+        const exitBtn = this.add
+            .image(w / 2 + spacing, h / 2 + h * 0.2, 'btn_exit')
+            .setOrigin(0.5)
+            .setScale(btnScale)
+            .setInteractive({ useHandCursor: true });
+
+        exitBtn.on('pointerdown', () => {
+            this.sound.play('sfx_click');
+            this.scene.start('MenuScene');
+        });
+
+        // ==== Optional: hover effect ====
+        [replayBtn, exitBtn].forEach((btn) => {
+            btn.on('pointerover', () => btn.setScale(btnScale * 1.1));
+            btn.on('pointerout', () => btn.setScale(btnScale));
+        });
     }
 }

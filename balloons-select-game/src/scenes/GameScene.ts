@@ -153,6 +153,12 @@ export default class GameScene extends Phaser.Scene {
             this.scene.start('MenuScene'); // scene muốn chuyển tới
         });
 
+        // ==== Optional: hover effect ====
+        [resetBtn, exitBtn].forEach((btn) => {
+            btn.on('pointerover', () => btn.setScale(btnScale * 1.1));
+            btn.on('pointerout', () => btn.setScale(btnScale));
+        });
+
         this.balloons = []; // reset balloons
 
         // rabbit: đặt theo tỉ lệ
