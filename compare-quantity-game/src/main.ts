@@ -3,13 +3,13 @@ import { CompareScene } from './scenes/CompareScene';
 
 const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
-    width: 1280, // chuẩn 16:9
+    width: 1280,
     height: 720,
     parent: 'game-container',
     backgroundColor: '#ffffff',
     scene: [CompareScene],
     scale: {
-        mode: Phaser.Scale.FIT,
+        mode: Phaser.Scale.FIT, // Canvas tự fit vào container
         autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     render: {
@@ -19,7 +19,7 @@ const config: Phaser.Types.Core.GameConfig = {
     },
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
 
 // --- Xử lý xoay ngang trên mobile ---
 function resizeGame() {
@@ -44,6 +44,14 @@ function resizeGame() {
         gameDiv.style.height = `${h}px`;
     }
 }
+
+// Gọi lần đầu
+window.addEventListener('resize', () => {
+    resizeGame();
+});
+window.addEventListener('orientationchange', () => {
+    resizeGame();
+});
 
 // Gọi lần đầu
 resizeGame();

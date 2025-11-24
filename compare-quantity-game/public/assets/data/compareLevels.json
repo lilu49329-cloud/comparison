@@ -1,0 +1,44 @@
+[
+    {
+        "id": 1,
+        "mode": "side",
+        "left": {
+            "icon": "turtle",
+            "count": 2
+        },
+        "right": {
+            "icon": "turtle",
+            "count": 5
+        },
+        "questionType": "more",
+        "correctSide": "right"
+    },
+    {
+        "id": 2,
+        "mode": "side",
+        "left": {
+            "icon": "cat",
+            "count": 4
+        },
+        "right": {
+            "icon": "cat",
+            "count": 1
+        },
+        "questionType": "less",
+        "correctSide": "right"
+    },
+    {
+        "id": 3,
+        "mode": "side",
+        "left": {
+            "icon": "dolphin",
+            "count": 3
+        },
+        "right": {
+            "icon": "dolphin",
+            "count": 4
+        },
+        "questionType": "less",
+        "correctSide": "left"
+    }
+]
