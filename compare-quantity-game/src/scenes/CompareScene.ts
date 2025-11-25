@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
+import { showGameButtons } from '../main';
 
 // ====== Định nghĩa type level ======
 
-type Mode = 'side' | 'operator';
 type QuestionType = 'more' | 'less';
 
 interface BaseSideConfig {
@@ -37,8 +37,10 @@ type GameState = 'idle' | 'checking' | 'transition' | 'result';
 
 export class CompareScene extends Phaser.Scene {
     // dữ liệu level
-    private levels: CompareLevel[] = [];
     private currentLevelIndex = 0;
+    private allLevels: CompareLevel[] = [];
+    private levels: CompareLevel[] = []; // 5 level được chọn cho lượt chơi
+    private readonly LEVELS_PER_GAME = 5;
 
     rabbit!: Phaser.GameObjects.Image;
     boy!: Phaser.GameObjects.Image;
@@ -50,16 +52,31 @@ export class CompareScene extends Phaser.Scene {
     private state: GameState = 'idle';
 
     // UI elements tái sử dụng
-    private questionText!: Phaser.GameObjects.Text;
+    private questionBar!: Phaser.GameObjects.Image;
     private leftPanel!: Phaser.GameObjects.Image;
     private rightPanel!: Phaser.GameObjects.Image;
-    private nextButton!: Phaser.GameObjects.Image;
+    // private nextButton!: Phaser.GameObjects.Image;
 
     // danh sách sprite của level hiện tại để dễ clear
     private levelObjects: Phaser.GameObjects.GameObject[] = [];
 
     private leftPanelAnimals: Phaser.GameObjects.Image[] = [];
     private rightPanelAnimals: Phaser.GameObjects.Image[] = [];
+
+    private containerEl!: HTMLElement | null;
+
+    private bgByIcon: Record<string, string> = {
+        turtle: '/assets/images/bg/bg_sea.webp',
+        dolphin: '/assets/images/bg/bg_sea.webp',
+
+        cow: '/assets/images/bg/bg_way.webp',
+        chicken: '/assets/images/bg/bg_farm.webp',
+
+        cat: '/assets/images/bg/bg_home.webp',
+        dog: '/assets/images/bg/bg_home.webp',
+
+        monkey: '/assets/images/bg/bg_forest.webp',
+    };
 
     constructor() {
         super('CompareScene');
@@ -81,89 +98,73 @@ export class CompareScene extends Phaser.Scene {
 
     preload() {
         // ---- HÌNH ẢNH ----
-        this.load.image(
-            'rabbit_idle',
-            '/assets/images/characters/rabbit_idle.png'
-        );
-        this.load.image(
-            'rabbit_cheer',
-            '/assets/images/characters/rabbit_cheer.png'
-        );
-        this.load.image('boy', '/assets/images/characters/boy.png');
+        this.load.image('boy', '/assets/images/characters/boy.webp');
 
-        this.load.image('turtle', 'assets/images/animals/turtle.png');
-        this.load.image('cat', 'assets/images/animals/cat.png');
-        this.load.image('dolphin', 'assets/images/animals/dolphin.png');
+        this.load.image('turtle', 'assets/images/animals/turtle.webp');
+        this.load.image('cat', 'assets/images/animals/cat.webp');
+        this.load.image('dolphin', 'assets/images/animals/dolphin.webp');
+        this.load.image('dog', 'assets/images/animals/dog.webp');
+        this.load.image('chicken', 'assets/images/animals/chicken.webp');
+        this.load.image('cow', 'assets/images/animals/cow.webp');
+        this.load.image('monkey', 'assets/images/animals/monkey.webp');
 
+        // UI
+        this.load.image('question_more', 'assets/images/ui/question_more.webp');
+        this.load.image('question_less', 'assets/images/ui/question_less.webp');
         this.load.image('panel_bg', 'assets/images/ui/panel_bg.png');
         this.load.image('panel_bg_correct', 'assets/images/ui/panel_bg_ok.png'); // panel đúng
         this.load.image(
             'panel_bg_wrong',
             'assets/images/ui/panel_bg_wrong.png'
         ); // panel sai
-
-        // this.load.image('btn_reset', 'assets/images/ui/btn_reset.png');
-        this.load.image('btn_next', 'assets/images/ui/btn_next.png');
+        this.load.image('result_bg', 'assets/images/ui/result_bg.webp');
 
         // ---- ÂM THANH ----
         this.load.audio('sfx-correct', 'assets/audio/sfx/correct.wav');
         this.load.audio('sfx-wrong', 'assets/audio/sfx/wrong.wav');
         this.load.audio('sfx-click', 'assets/audio/sfx/click.wav');
+        this.load.audio(
+            'correct_answer',
+            'assets/audio/sfx/correct_answer.mp3'
+        );
+
+        this.load.audio('prompt_less', 'assets/audio/prompt/prompt_less.mp3');
+        this.load.audio('prompt_more', 'assets/audio/prompt/prompt_more.mp3');
 
         // ---- LEVEL DATA (JSON) ----
         this.load.json('compareLevels', 'assets/data/compareLevels.json');
     }
 
     create() {
-        const { width, height } = this.scale;
+        // Cho phép html-button gọi vào compareScene qua global
+        (window as any).compareScene = this;
 
-        // 👉 Thêm nhân vật thỏ ở góc trái bên dưới
-        // this.rabbit = this.add
-        //     .image(this.pctX(-0.05), this.pctY(1.1), 'rabbit_idle')
-        //     .setOrigin(0, 1); // gốc ở bottom-left
-        // this.rabbit.setScale(0.7); // tuỳ kích thước sprite thực tế
+        this.containerEl = document.getElementById('game-container');
 
         this.boy = this.add
             .image(this.pctX(0.01), this.pctY(0.9), 'boy')
             .setOrigin(0, 1); // gốc ở bottom-left
         this.boy.setScale(0.5); // tuỳ kích thước sprite thực tế
         // Có thể thêm idle tween nhẹ cho sống động:
-        // this.tweens.add({
-        //     targets: this.rabbit,
-        //     y: this.rabbit.y - 10,
-        //     duration: 800,
-        //     yoyo: true,
-        //     repeat: -1,
-        //     ease: 'Sine.inOut',
-        // });
+        this.tweens.add({
+            targets: this.boy,
+            y: this.boy.y - 10,
+            duration: 800,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.inOut',
+        });
 
         // ===== Thanh câu hỏi =====
-        this.questionText = this.add
-            .text(width / 2, 60, 'Đang tải câu hỏi...', {
-                fontSize: '36px',
-                color: '#ffffff',
-                fontFamily: 'Arial',
-                align: 'center',
-                wordWrap: { width: width * 0.8 },
-            })
-            .setOrigin(0.5, 0.5);
+        this.questionBar = this.add
+            .image(this.pctX(0.58), this.pctY(0.1), 'question_more')
+            .setOrigin(0.5, 0.5)
+            .setDepth(5);
 
-        // ===== Nút Next (chuyển level) =====
-        this.nextButton = this.add
-            .image(this.pctX(0.9), this.pctY(0.15), 'btn_next')
-            .setOrigin(0.5)
-            .setScale(0.8)
-            .setDepth(10)
-            .setInteractive({ useHandCursor: true });
-
-        this.nextButton.visible = false; // 👉 mặc định ẩn
-
-        this.nextButton.on('pointerdown', () => {
-            // if (this.state !== 'waitingNext') return; // chỉ cho bấm khi đã đúng
-            this.sound.play('sfx-click');
-            this.nextButton.visible = false;
-            this.goToNextLevel();
-        });
+        // nếu muốn fit theo chiều rộng màn:
+        const barWidth = this.getW() * 0.4;
+        const ratio = this.questionBar.height / this.questionBar.width;
+        this.questionBar.setDisplaySize(barWidth, barWidth * ratio);
 
         this.createPanels();
 
@@ -173,12 +174,12 @@ export class CompareScene extends Phaser.Scene {
             | undefined;
 
         if (loadedLevels && Array.isArray(loadedLevels)) {
-            this.levels = loadedLevels;
+            this.allLevels = loadedLevels;
         } else {
             console.warn(
                 '[CompareScene] Không load được compareLevels.json, dùng dữ liệu fallback'
             );
-            this.levels = [
+            this.allLevels = [
                 {
                     id: 1,
                     mode: 'side',
@@ -190,25 +191,37 @@ export class CompareScene extends Phaser.Scene {
             ];
         }
 
+        // chọn ngẫu nhiên 5 level cho lượt chơi
+        this.levels = this.pickRandomLevels(
+            this.allLevels,
+            this.LEVELS_PER_GAME
+        );
+
         this.currentLevelIndex = 0;
         this.score = 0;
         this.state = 'idle';
 
         this.showCurrentLevel();
+        showGameButtons();
     }
 
-    update(time: number, delta: number): void {
-        // Sau có thể anim background, bong bóng, v.v.
+    private setBackgroundForLevel(level: CompareLevel) {
+        if (!this.containerEl) return;
+
+        const icon = level.left.icon; // mình dùng icon bên trái làm chuẩn
+        const url = this.bgByIcon[icon] ?? '/assets/images/bg/bg_forest.png';
+
+        this.containerEl.style.backgroundImage = `url('${url}')`;
     }
 
     private createPanels() {
         const panelWidth = this.getW() * 0.35;
-        const panelHeight = this.getH() * 0.7;
+        const panelHeight = this.getH() * 0.75;
 
         // toạ độ theo tỉ lệ màn
         const panelY = this.pctY(0.55);
-        const leftX = this.pctX(0.4); // 0.5 - 0.15
-        const rightX = this.pctX(0.76); // 0.5 + 0.23
+        const leftX = this.pctX(0.4);
+        const rightX = this.pctX(0.76);
 
         this.leftPanel = this.add
             .image(leftX, panelY, 'panel_bg')
@@ -223,6 +236,19 @@ export class CompareScene extends Phaser.Scene {
             .setDepth(1);
     }
 
+    private pickRandomLevels(
+        source: CompareLevel[],
+        count: number
+    ): CompareLevel[] {
+        if (source.length <= count) {
+            // ít hơn hoặc bằng N thì chơi hết
+            return Phaser.Utils.Array.Shuffle(source.slice());
+        }
+
+        const shuffled = Phaser.Utils.Array.Shuffle(source.slice());
+        return shuffled.slice(0, count);
+    }
+
     // ========== HÀM HIỂN THỊ LEVEL ==========
 
     private showCurrentLevel() {
@@ -232,7 +258,10 @@ export class CompareScene extends Phaser.Scene {
 
         // reset attempt
         this.state = 'idle';
-        this.nextButton.visible = false;
+        // this.nextButton.visible = false;
+
+        // 👉 set background theo con vật của level hiện tại
+        this.setBackgroundForLevel(level);
 
         // 🔁 RESET PANEL VỀ TRẠNG THÁI BÌNH THƯỜNG
         if (this.leftPanel) {
@@ -246,10 +275,13 @@ export class CompareScene extends Phaser.Scene {
 
         // 1. Cập nhật câu hỏi
         if (level.mode === 'side') {
+            // 1. Cập nhật thanh câu hỏi (ảnh)
             if (level.questionType === 'more') {
-                this.questionText.setText('Bên nào có NHIỀU con hơn?');
+                this.sound.play('prompt_more');
+                this.questionBar.setTexture('question_more');
             } else {
-                this.questionText.setText('Bên nào có ÍT con hơn?');
+                this.sound.play('prompt_less');
+                this.questionBar.setTexture('question_less');
             }
         }
 
@@ -399,14 +431,8 @@ export class CompareScene extends Phaser.Scene {
             // khoá panel, chờ bé bấm Next
             this.leftPanel.disableInteractive();
             this.rightPanel.disableInteractive();
-
-            // this.state = 'waitingNext';
-            this.nextButton.visible = true; // 👉 chỉ đúng mới hiện Next
         } else {
             this.playWrongFeedback(panel);
-
-            // Sai thì chắc chắn ẩn Next (phòng khi vì lý do gì đó nó đang hiện)
-            this.nextButton.visible = false;
 
             // Cho bé làm lại cùng câu
             this.time.delayedCall(500, () => {
@@ -419,13 +445,23 @@ export class CompareScene extends Phaser.Scene {
 
     private playCorrectFeedback(panel: Phaser.GameObjects.Image) {
         this.sound.play('sfx-correct', { volume: 0.8 });
+        this.sound.play('correct_answer');
+
+        // lấy danh sách con vật thuộc panel này
+        const animals =
+            panel === this.leftPanel
+                ? this.leftPanelAnimals
+                : this.rightPanelAnimals;
+
+        // targets = panel + tất cả con vật trong panel
+        const targets: Phaser.GameObjects.GameObject[] = [panel, ...animals];
 
         // đổi texture sang panel đúng, giữ nguyên cho đến hết câu
         panel.setTexture('panel_bg_correct');
 
         // hiệu ứng zoom nhẹ cho vui mắt
         this.tweens.add({
-            targets: panel,
+            targets,
             scaleX: panel.scaleX * 1.03,
             scaleY: panel.scaleY * 1.03,
             yoyo: true,
@@ -466,7 +502,8 @@ export class CompareScene extends Phaser.Scene {
 
     // ========== CHUYỂN LEVEL & KẾT QUẢ ==========
 
-    private goToNextLevel() {
+    goToNextLevel() {
+        this.sound.play('sfx-click');
         this.currentLevelIndex += 1;
 
         if (this.currentLevelIndex >= this.levels.length) {
@@ -479,53 +516,27 @@ export class CompareScene extends Phaser.Scene {
     private showResultScreen() {
         this.state = 'result';
 
-        // dọn object level
+        // dọn sprite, tắt tương tác
         this.clearLevelObjects();
 
-        const { width, height } = this.scale;
+        if (this.leftPanel) this.leftPanel.disableInteractive();
+        if (this.rightPanel) this.rightPanel.disableInteractive();
 
-        const overlay = this.add.rectangle(
-            width / 2,
-            height / 2,
-            width * 0.8,
-            height * 0.6,
-            0x000000,
-            0.7
-        );
-        this.levelObjects.push(overlay);
-
-        const resultText = this.add
-            .text(
-                width / 2,
-                height / 2 - 40,
-                `Con làm đúng ${this.score}/${this.levels.length} câu!`,
-                {
-                    fontSize: '40px',
-                    color: '#ffffff',
-                    fontFamily: 'Arial',
-                    align: 'center',
-                }
-            )
-            .setOrigin(0.5);
-        this.levelObjects.push(resultText);
-
-        const replayText = this.add
-            .text(width / 2, height / 2 + 40, 'Chạm để chơi lại', {
-                fontSize: '28px',
-                color: '#ffff66',
-                fontFamily: 'Arial',
-            })
-            .setOrigin(0.5);
-        this.levelObjects.push(replayText);
-
-        // cho phép chạm bất kỳ đâu để chơi lại
-        overlay.setInteractive({ useHandCursor: true });
-        overlay.on('pointerdown', () => {
-            this.restartGame();
+        // chuyển sang EndGameScene, truyền điểm + tổng số câu
+        this.scene.start('EndGameScene', {
+            score: this.score,
+            total: this.levels.length,
         });
     }
 
-    private restartGame() {
+    restartGame() {
+        this.sound.play('sfx-click');
+        // random lại 5 level từ pool
+        this.levels = this.pickRandomLevels(
+            this.allLevels,
+            this.LEVELS_PER_GAME
+        );
+
         this.currentLevelIndex = 0;
         this.score = 0;
         this.state = 'idle';
