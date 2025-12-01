@@ -1,0 +1,79 @@
+{
+    "lessonId": "height_basic_01",
+    "title": "Cao hơn / Thấp hơn",
+    "concept": "HEIGHT",
+    "defaultMode": "BINARY_PICK",
+    "defaultPromptText": "Con hãy chạm vào bức tranh có cây cao hơn.",
+    "defaultPromptAudio": "audio/height/default_prompt.mp3",
+    "items": [
+        {
+            "id": "q1",
+            "promptText": "Chọn cái cây cao hơn.",
+            "options": [
+                {
+                    "id": "opt1",
+                    "image": "assets/height/tree_short.png",
+                    "value": 1
+                },
+                {
+                    "id": "opt2",
+                    "image": "assets/height/tree_tall.png",
+                    "value": 3
+                }
+            ],
+            "correctOptionId": "opt2",
+            "difficulty": 1
+        },
+        {
+            "id": "q2",
+            "promptText": "Chọn tòa nhà cao hơn.",
+            "options": [
+                {
+                    "id": "opt1",
+                    "image": "assets/height/building_low.png",
+                    "value": 2
+                },
+                {
+                    "id": "opt2",
+                    "image": "assets/height/building_high.png",
+                    "value": 3
+                },
+                {
+                    "id": "opt3",
+                    "image": "assets/height/building_high.png",
+                    "value": 4
+                }
+            ],
+            "correctOptionId": "opt3",
+            "difficulty": 1
+        },
+        {
+            "id": "q2",
+            "promptText": "Chọn tòa nhà cao hơn.",
+            "options": [
+                {
+                    "id": "opt1",
+                    "image": "assets/height/building_low.png",
+                    "value": 1
+                },
+                {
+                    "id": "opt2",
+                    "image": "assets/height/building_low.png",
+                    "value": 2
+                },
+                {
+                    "id": "opt3",
+                    "image": "assets/height/building_high.png",
+                    "value": 4
+                },
+                {
+                    "id": "opt4",
+                    "image": "assets/height/building_high.png",
+                    "value": 3
+                }
+            ],
+            "correctOptionId": "opt3",
+            "difficulty": 1
+        }
+    ]
+}
