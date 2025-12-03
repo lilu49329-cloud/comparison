@@ -1,4 +1,7 @@
 import Phaser from 'phaser';
+import type GameScene from './GameScene';
+
+
 
 type Subject = 'BALLOON' | 'FLOWER';
 
@@ -23,31 +26,33 @@ const BOY_UPGRADE_TEXTURE: Record<Subject, string> = {
   FLOWER: 'boy_flower_plus',
 };
 
+const HAND_OFFSET: Record<Subject, { x: number; y: number }> = {
+  BALLOON: { x: 55, y: -80 },
+  FLOWER: { x: 40, y: -40 },
+};
+
+const UPGRADE_OFFSET: Record<Subject, { x: number; y: number }> = {
+  BALLOON: { x: 50, y: 0 },
+  FLOWER: { x: 0, y: 0 },
+};
+
 type BalanceInitData = {
   leftCount: number;
   rightCount: number;
-  nextScene: string;
-  score: number;
-  levelIndex: number;
   subject: Subject;
+  // nhân vật ở màn chính đang cầm ÍT đồ hơn (để biết ai cần được thêm bóng/hoa)
+  lessCharacter: 'GIRL' | 'BOY';
+  nextScene?: string;
+  score?: number;
+  levelIndex?: number;
 };
 
 export default class BalanceScene extends Phaser.Scene {
-  private leftCount = 0;
-  private rightCount = 0;
-
-  private nextSceneKey = 'GameScene';
-  private score = 0;
-  private levelIndex = 0;
-
   private subject: Subject = 'BALLOON';
-
-  private feedbackText!: Phaser.GameObjects.Text;
 
   // layout
   private panelLeftX = 240;
   private actorY = 450;
-  private baseY = 340;
 
   private leftActorCenterX = 640;
   private rightActorCenterX = 1030;
@@ -59,23 +64,27 @@ export default class BalanceScene extends Phaser.Scene {
   private boyBase!: Phaser.GameObjects.Image;
   private boyUpgraded!: Phaser.GameObjects.Image;
 
+  private girlSide: 'LEFT' | 'RIGHT' = 'LEFT';
+  private boySide: 'LEFT' | 'RIGHT' = 'RIGHT';
+  private upgradeCharacter: 'GIRL' | 'BOY' = 'GIRL';
+  private nextSceneKey = 'GameScene';
+  private score = 0;
+  private levelIndex = 0;
+
   constructor() {
     super('BalanceScene');
   }
 
   init(data: BalanceInitData) {
-    this.leftCount = data.leftCount;
-    this.rightCount = data.rightCount;
-
+    this.subject = data.subject ?? 'BALLOON';
+    this.upgradeCharacter = data.lessCharacter ?? 'GIRL';
     this.nextSceneKey = data.nextScene ?? 'GameScene';
     this.score = data.score ?? 0;
     this.levelIndex = data.levelIndex ?? 0;
-
-    this.subject = data.subject ?? 'BALLOON';
   }
 
   create() {
-    const { width, height } = this.scale;
+    const { width } = this.scale;
 
     this.scene.bringToTop();
 
@@ -88,14 +97,15 @@ export default class BalanceScene extends Phaser.Scene {
     const banner = this.add
       .image(width / 2, bannerY, 'btn_primary_pressed')
       .setOrigin(0.5);
-    banner.setScale(0.65);
+    const bannerBaseScaleY = 0.65;
+    banner.setScale(bannerBaseScaleY);
 
     const bannerText =
       this.subject === 'BALLOON'
         ? 'THÊM BÓNG BAY CHO HAI BẠN BẰNG NHAU NHÉ!'
-        : 'THÊM HOA CHO HAI BẠN BẰNG NHAU NHÉ!';
+        : 'THÊM BÔNG HOA CHO HAI LỌ BẰNG NHAU NHÉ!';
 
-    this.add
+    const titleText = this.add
       .text(width / 2, bannerY, bannerText, {
         fontFamily: 'San Francisco, "Noto Sans", system-ui, sans-serif',
         fontSize: '30px',
@@ -104,6 +114,15 @@ export default class BalanceScene extends Phaser.Scene {
         align: 'center',
       })
       .setOrigin(0.5);
+
+    // Tự động kéo dài banner để ôm trọn text
+    const textWidth = titleText.width;
+    const baseBannerWidth = banner.width;
+    const padding = 200; // tăng khoảng dư hai bên cho thoải mái hơn
+    const minBannerWidth = 800;
+    const desiredWidth = Math.max(minBannerWidth, textWidth + padding);
+    const scaleX = desiredWidth / baseBannerWidth;
+    banner.setScale(scaleX, bannerBaseScaleY);
 
     // Panel trái
     const leftPanelX = 80;
@@ -149,8 +168,11 @@ export default class BalanceScene extends Phaser.Scene {
     this.leftActorCenterX = actorPanelX + actorPanelWidth * 0.25;
     this.rightActorCenterX = actorPanelX + actorPanelWidth * 0.75;
 
-    this.baseY = actorPanelCenterY;
     this.actorY = actorPanelCenterY + 20;
+
+    // Random vị trí nhân vật nhận kéo: cô bé / cậu bé trái-phải
+    this.girlSide = Math.random() < 0.5 ? 'LEFT' : 'RIGHT';
+    this.boySide = this.girlSide === 'LEFT' ? 'RIGHT' : 'LEFT';
 
     // ===== Nhân vật base & upgraded (cùng tâm) =====
     const girlBaseKey = GIRL_TEXTURE[this.subject];
@@ -166,14 +188,18 @@ export default class BalanceScene extends Phaser.Scene {
     const maxCharHeight = actorPanelHeight * 0.8;
     const maxCharWidth = actorPanelWidth * 0.3;
 
-    const girlScale = Math.min(
+    // Tính scale cho từng ảnh rồi lấy scale chung nhỏ nhất
+    const girlScaleRaw = Math.min(
       maxCharHeight / girlTex.height,
       maxCharWidth / girlTex.width
     );
-    const boyScale = Math.min(
+    const boyScaleRaw = Math.min(
       maxCharHeight / boyTex.height,
       maxCharWidth / boyTex.width
     );
+    const charScale = Math.min(girlScaleRaw, boyScaleRaw);
+    const girlScale = charScale;
+    const boyScale = charScale;
 
     const girlUpKeyCandidate = GIRL_UPGRADE_TEXTURE[this.subject];
     const boyUpKeyCandidate = BOY_UPGRADE_TEXTURE[this.subject];
@@ -185,24 +211,44 @@ export default class BalanceScene extends Phaser.Scene {
       ? boyUpKeyCandidate
       : boyBaseKey;
 
+    const upgradeOffset = UPGRADE_OFFSET[this.subject];
+
     // Girl – base & upgraded luôn cùng (x,y), origin 0.5 nên ở đúng giữa nửa panel
+    const girlX =
+      this.girlSide === 'LEFT'
+        ? this.leftActorCenterX
+        : this.rightActorCenterX;
+
     this.girlBase = this.add
-      .image(this.leftActorCenterX, this.actorY, girlBaseKey)
+      .image(girlX, this.actorY, girlBaseKey)
       .setOrigin(0.5, 0.5)
       .setScale(girlScale);
     this.girlUpgraded = this.add
-      .image(this.leftActorCenterX, this.actorY, girlUpgradeKey)
+      .image(
+        girlX + upgradeOffset.x,
+        this.actorY + upgradeOffset.y,
+        girlUpgradeKey
+      )
       .setOrigin(0.5, 0.5)
       .setScale(girlScale)
       .setAlpha(0);
 
-    // Boy – base & upgraded cũng cùng (x,y), nên khi nhảy asset không bị lệch sang trái/phải
+    // Boy – base & upgraded cũng cùng (x,y)
+    const boyX =
+      this.boySide === 'LEFT'
+        ? this.leftActorCenterX
+        : this.rightActorCenterX;
+
     this.boyBase = this.add
-      .image(this.rightActorCenterX, this.actorY, boyBaseKey)
+      .image(boyX, this.actorY, boyBaseKey)
       .setOrigin(0.5, 0.5)
       .setScale(boyScale);
     this.boyUpgraded = this.add
-      .image(this.rightActorCenterX, this.actorY, boyUpgradeKey)
+      .image(
+        boyX + upgradeOffset.x,
+        this.actorY + upgradeOffset.y,
+        boyUpgradeKey
+      )
       .setOrigin(0.5, 0.5)
       .setScale(boyScale)
       .setAlpha(0);
@@ -224,11 +270,12 @@ export default class BalanceScene extends Phaser.Scene {
 
     this.objectScale = Math.min(scaleFromChar, scaleFromPanel);
 
-    // Bên nào cần thêm bóng/hoa?
-    const addToLeft = this.leftCount < this.rightCount;
-    const upgradeSide: 'LEFT' | 'RIGHT' = addToLeft ? 'LEFT' : 'RIGHT';
+    // Bên nào sẽ nhận thêm bóng/hoa? – dựa theo nhân vật ít đồ hơn ở màn chính
+    const upgradeSide: 'LEFT' | 'RIGHT' =
+      this.upgradeCharacter === 'GIRL' ? this.girlSide : this.boySide;
 
     // ===== BÓNG/HOA KÉO Ở PANEL TRÁI =====
+    // asset kéo luôn xuất phát ở đúng tâm panel trái
     const startX = this.panelLeftX;
     const centerY = leftPanelY + leftPanelHeight / 2 + leftCenterOffsetY;
     const startY = centerY;
@@ -238,7 +285,22 @@ export default class BalanceScene extends Phaser.Scene {
       .setScale(this.objectScale)
       .setInteractive({ draggable: true });
 
+    const idleTween = this.tweens.add({
+      targets: draggable,
+      y: startY - 15,
+      angle: -3,
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    });
+
     this.input.setDraggable(draggable);
+
+    draggable.on('dragstart', () => {
+      idleTween.stop();
+      draggable.setAngle(0);
+    });
 
     draggable.on('drag', (_: Phaser.Input.Pointer, x: number, y: number) => {
       draggable.x = x;
@@ -246,13 +308,12 @@ export default class BalanceScene extends Phaser.Scene {
     });
 
     // vùng valid quanh tay / bình hoa
-    const handOffsetX = this.subject === 'BALLOON' ? 55 : 40;
-    const handOffsetY = this.subject === 'BALLOON' ? -80 : -40;
+    const handOffset = HAND_OFFSET[this.subject];
 
     const targetActorCenterX =
       upgradeSide === 'LEFT' ? this.leftActorCenterX : this.rightActorCenterX;
-    const targetX = targetActorCenterX + handOffsetX;
-    const targetY = this.actorY + handOffsetY;
+    const targetX = targetActorCenterX + handOffset.x;
+    const targetY = this.actorY + handOffset.y;
 
     draggable.on('dragend', () => {
       const dist = Phaser.Math.Distance.Between(
@@ -265,7 +326,8 @@ export default class BalanceScene extends Phaser.Scene {
       if (dist < 180) {
         draggable.disableInteractive();
 
-        // bóng kéo mờ dần rồi xoá
+        idleTween.stop();
+
         this.tweens.add({
           targets: draggable,
           alpha: 0,
@@ -274,34 +336,43 @@ export default class BalanceScene extends Phaser.Scene {
         });
 
         const baseSprite =
-          upgradeSide === 'LEFT' ? this.girlBase : this.boyBase;
+          this.upgradeCharacter === 'GIRL' ? this.girlBase : this.boyBase;
         const upgradedSprite =
-          upgradeSide === 'LEFT' ? this.girlUpgraded : this.boyUpgraded;
+          this.upgradeCharacter === 'GIRL'
+            ? this.girlUpgraded
+            : this.boyUpgraded;
 
-        // đảm bảo upgraded giữ đúng tâm nửa panel
-        upgradedSprite.setPosition(
+        const upgradedCenterX =
           upgradeSide === 'LEFT'
             ? this.leftActorCenterX
-            : this.rightActorCenterX,
-          this.actorY
+            : this.rightActorCenterX;
+
+        upgradedSprite.setPosition(
+          upgradedCenterX + upgradeOffset.x,
+          this.actorY + upgradeOffset.y
         );
 
-        // base mờ dần
         this.tweens.add({
           targets: baseSprite,
           alpha: 0,
           duration: 220,
         });
 
-        // asset mới hiện dần ngay tại đúng tâm (không lệch trái/phải)
         this.tweens.add({
           targets: upgradedSprite,
           alpha: 1,
           duration: 220,
           delay: 80,
           onComplete: () => {
-            this.feedbackText.setText('Tuyệt vời! Hai bạn đã bằng nhau!');
-            this.time.delayedCall(900, () => {
+            (window as any).playVoiceLocked(this.sound, 'voice_complete');
+
+            const gameScene = this.scene.get('GameScene') as GameScene | null;
+            if (gameScene) {
+              gameScene.subgameDone = true;
+            }
+
+            // tự động chuyển sang màn chính tiếp theo sau khi hoàn thành màn phụ
+            this.time.delayedCall(1500, () => {
               this.scene.start(this.nextSceneKey, {
                 score: this.score,
                 levelIndex: this.levelIndex + 1,
@@ -310,22 +381,16 @@ export default class BalanceScene extends Phaser.Scene {
           },
         });
       } else {
+        // trả lại đúng tâm panel trái khi kéo sai
         draggable.x = startX;
         draggable.y = startY;
+        draggable.setAngle(0);
+        idleTween.restart();
       }
     });
 
-    const feedbackBaseText =
-      this.subject === 'BALLOON'
-        ? 'Kéo bóng sang cho đủ nhé!'
-        : 'Kéo hoa sang cho đủ nhé!';
-
-    this.feedbackText = this.add
-      .text(width / 2, height - 50, feedbackBaseText, {
-        fontSize: '26px',
-        color: '#333',
-        fontFamily: 'Fredoka',
-      })
-      .setOrigin(0.5);
+    const dragKey =
+      this.subject === 'BALLOON' ? 'drag_balloon' : 'drag_flower';
+    (window as any).playVoiceLocked(this.sound, dragKey);
   }
 }
