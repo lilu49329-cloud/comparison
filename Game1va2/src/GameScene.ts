@@ -156,6 +156,8 @@ export default class GameScene extends Phaser.Scene {
   nextBtn?: Phaser.GameObjects.GameObject;
 
   bgm?: Phaser.Sound.BaseSound;
+  private sfxWrong?: Phaser.Sound.BaseSound;
+  private sfxCorrect?: Phaser.Sound.BaseSound;
 
   constructor() {
     super({ key: "GameScene" });
@@ -307,6 +309,10 @@ export default class GameScene extends Phaser.Scene {
       bgm.play();
     }
     this.bgm = bgm;
+
+    // Khởi tạo hiệu ứng âm thanh để tránh lặp / chồng khi spam click
+    this.sfxWrong = this.sound.add("sfx_wrong");
+    this.sfxCorrect = this.sound.add("sfx_correct");
 
     const level = this.levels[this.level];
 
@@ -788,14 +794,18 @@ export default class GameScene extends Phaser.Scene {
         const objN = objCard.customData!.number;
 
         if (n !== objN && !this.matches[startIndex]) {
-          this.sound.play("sfx_wrong");
+          if (this.sfxWrong && !this.sfxWrong.isPlaying) {
+            this.sfxWrong.play();
+          }
         }
 
         if (n === objN && !this.matches[startIndex]) {
           matched = true;
           this.matches[startIndex] = true;
 
-          this.sound.play("sfx_correct");
+          if (this.sfxCorrect && !this.sfxCorrect.isPlaying) {
+            this.sfxCorrect.play();
+          }
 
           startCard.clearTint();
           objCard.clearTint();
