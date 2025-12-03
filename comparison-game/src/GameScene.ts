@@ -167,6 +167,16 @@ export default class GameScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
+    // Đảm bảo asset voice_rotate luôn có trong sound manager
+    if (!this.sound.get("voice_rotate")) {
+      try {
+        this.sound.add("voice_rotate");
+        console.log("[GameScene] Đã add voice_rotate vào sound manager");
+      } catch (e) {
+        console.warn("[GameScene] Không add được voice_rotate:", e);
+      }
+    }
+
     // Ẩn nút HTML ở màn câu hỏi, chỉ hiện khi sang màn phụ (BalanceScene)
     if ((window as any).setGameButtonsVisible) {
       (window as any).setGameButtonsVisible(true);

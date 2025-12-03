@@ -49,6 +49,8 @@ export default class PreloadScene extends Phaser.Scene {
         this.load.audio('q_flower_more', 'assets/audio/more_f.ogg');
         this.load.audio('q_flower_less', 'assets/audio/less_f.ogg');
         this.load.audio('voice_end', 'assets/audio/voice_end.ogg');
+
+        this.load.audio('voice_rotate', 'assets/audio/xoay.ogg');
     }
 
     create() {

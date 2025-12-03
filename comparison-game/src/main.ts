@@ -110,8 +110,94 @@ if (container instanceof HTMLDivElement) {
 
 let game: Phaser.Game | null = null;
 let rotateOverlay: HTMLDivElement | null = null;
+
+// ========== HÀM CHỐNG SPAM / CHỒNG VOICE ==========
+let currentVoice: Phaser.Sound.BaseSound | null = null;
+let currentVoiceKey: string | null = null;
+let isRotateOverlayActive = false; // trạng thái overlay xoay ngang
+
+// Lưu lại BGM loop + question đang phát khi bước vào overlay dọc
+let pausedLoopKeys: string[] = [];
+let pendingQuestionKey: string | null = null;
+
+function getVoicePriority(key: string): number {
+  // Ưu tiên thấp: drag / câu hỏi
+  if (key.startsWith("drag_") || key.startsWith("q_")) return 1;
+  // Trung bình: đúng / sai
+  if (key === "correct" || key === "wrong") return 2;
+  // Trung bình / cao: các voice hướng dẫn
+  if (key === "voice_need_finish" || key === "voice_rotate") return 3;
+  // Cao nhất: complete
+  if (key === "voice_complete") return 4;
+  // Mặc định
+  return 1;
+}
+
+export function playVoiceLocked(
+  sound: Phaser.Sound.BaseSoundManager,
+  key: string
+): void {
+  // Khi overlay xoay ngang đang hiện: chỉ cho phép phát voice_rotate
+  if (isRotateOverlayActive && key !== "voice_rotate") {
+    console.warn(`[CompareGame] Đang overlay xoay ngang, chỉ phát voice_rotate!`);
+    return;
+  }
+
+  const newPri = getVoicePriority(key);
+  const curPri = currentVoiceKey ? getVoicePriority(currentVoiceKey) : 0;
+
+  // Nếu đang có voice chạy với priority >= mới thì bỏ qua (không chồng)
+  if (currentVoice && currentVoice.isPlaying && curPri >= newPri) {
+    return;
+  }
+
+  // Nếu voice mới ưu tiên cao hơn thì dừng voice cũ trước
+  if (currentVoice && currentVoice.isPlaying && curPri < newPri) {
+    currentVoice.stop();
+    currentVoice = null;
+    currentVoiceKey = null;
+  }
+
+  let instance = sound.get(key) as Phaser.Sound.BaseSound | null;
+  if (!instance) {
+    try {
+      // Nếu asset chưa có trong cache, add vào trước khi phát
+      instance = sound.add(key);
+      if (!instance) {
+        console.warn(
+          `[CompareGame] Không phát được audio key="${key}": Asset chưa được preload hoặc chưa có trong cache.`
+        );
+        return;
+      }
+    } catch (e) {
+      console.warn(`[CompareGame] Không phát được audio key="${key}":`, e);
+      return;
+    }
+  }
+
+  currentVoice = instance;
+  currentVoiceKey = key;
+  instance.once("complete", () => {
+    if (currentVoice === instance) {
+      currentVoice = null;
+      currentVoiceKey = null;
+    }
+  });
+  instance.play();
+}
+
+// Cố gắng resume AudioContext khi overlay bật/tắt
+function resumeSoundContext(gameScene: GameScene) {
+  const sm = gameScene.sound as any;
+  const ctx: AudioContext | undefined = sm.context || sm.audioContext;
+  if (ctx && ctx.state === "suspended" && typeof ctx.resume === "function") {
+    ctx.resume();
+  }
+}
+
 function ensureRotateOverlay() {
   if (rotateOverlay) return;
+
   rotateOverlay = document.createElement("div");
   rotateOverlay.id = "rotate-overlay";
   rotateOverlay.style.position = "fixed";
@@ -124,6 +210,7 @@ function ensureRotateOverlay() {
   rotateOverlay.style.background = "rgba(0, 0, 0, 0.6)";
   rotateOverlay.style.padding = "16px";
   rotateOverlay.style.boxSizing = "border-box";
+
   const box = document.createElement("div");
   box.style.background = "white";
   box.style.borderRadius = "16px";
@@ -133,24 +220,118 @@ function ensureRotateOverlay() {
   box.style.fontFamily =
     '"Fredoka", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   box.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
+
   const title = document.createElement("div");
   title.textContent = "Bé Hãy Xoay Ngang Màn Hình Để Chơi Nhé 🌈";
   title.style.fontSize = "18px";
   title.style.fontWeight = "700";
   title.style.marginBottom = "8px";
   title.style.color = "#222";
+
   box.appendChild(title);
   rotateOverlay.appendChild(box);
   document.body.appendChild(rotateOverlay);
 }
+
 function updateRotateHint() {
   ensureRotateOverlay();
   if (!rotateOverlay) return;
+
   const w = window.innerWidth;
   const h = window.innerHeight;
   const shouldShow = h > w && w < 768;
+
+  const overlayWasActive = isRotateOverlayActive;
+  isRotateOverlayActive = shouldShow;
+
+  const overlayTurnedOn = !overlayWasActive && shouldShow;
+  const overlayTurnedOff = overlayWasActive && !shouldShow;
+
   rotateOverlay.style.display = shouldShow ? "flex" : "none";
+
+  const gameScene = game?.scene?.getScene("GameScene") as GameScene | undefined;
+  if (!gameScene || !gameScene.sound) {
+    return;
+  }
+
+  const soundManager = gameScene.sound as any;
+  const sounds = soundManager.sounds as Phaser.Sound.BaseSound[] | undefined;
+
+  // Khi vừa bước vào màn hình dọc (overlay bật)
+  if (overlayTurnedOn && Array.isArray(sounds)) {
+    resumeSoundContext(gameScene);
+
+    pausedLoopKeys = [];
+    pendingQuestionKey = null;
+
+    sounds.forEach((snd: Phaser.Sound.BaseSound) => {
+      if (
+        snd &&
+        typeof snd.key === "string" &&
+        snd.key !== "voice_rotate" &&
+        snd.isPlaying &&
+        typeof snd.stop === "function"
+      ) {
+        // Lưu BGM loop lại để phát lại sau
+        if ((snd as any).loop) {
+          pausedLoopKeys.push(snd.key);
+        }
+        // Nếu là câu hỏi thì lưu key để đọc lại
+        if (snd.key.startsWith("q_")) {
+          pendingQuestionKey = snd.key;
+        }
+        snd.stop();
+      }
+    });
+  }
+
+  // Khi overlay bật lên lần đầu -> phát voice_rotate
+  if (overlayTurnedOn) {
+    const tryPlayVoiceRotate = () => {
+      const isActive = gameScene.scene.isActive();
+      const hasVoiceRotate = gameScene.sound.get("voice_rotate");
+      if (isActive && hasVoiceRotate) {
+        playVoiceLocked(gameScene.sound, "voice_rotate");
+      } else {
+        setTimeout(tryPlayVoiceRotate, 300);
+      }
+    };
+    tryPlayVoiceRotate();
+  }
+
+  // Khi overlay tắt -> dừng voice_rotate, phát lại BGM + question nếu có
+  if (overlayTurnedOff) {
+    resumeSoundContext(gameScene);
+
+    const rotateSound = gameScene.sound.get(
+      "voice_rotate"
+    ) as Phaser.Sound.BaseSound | null;
+    if (rotateSound && rotateSound.isPlaying) {
+      rotateSound.stop();
+    }
+    if (currentVoice === rotateSound) {
+      currentVoice = null;
+      currentVoiceKey = null;
+    }
+
+    // Phát lại các BGM loop đã pause
+    pausedLoopKeys.forEach((key) => {
+      const bg = gameScene.sound.get(key) as Phaser.Sound.BaseSound | null;
+      if (bg) {
+        (bg as any).loop = true;
+        bg.play();
+      }
+    });
+    pausedLoopKeys = [];
+
+    // Phát lại question nếu có
+    if (pendingQuestionKey) {
+      playVoiceLocked(gameScene.sound, pendingQuestionKey);
+      pendingQuestionKey = null;
+    }
+  }
 }
+
 function setupRotateHint() {
   ensureRotateOverlay();
   updateRotateHint();
@@ -176,73 +357,13 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [PreloadScene, GameScene, BalanceScene, EndGameScene],
 };
 
-// ========== HÀM CHỐNG SPAM / CHỒNG VOICE ==========
-// Cho phép voice ưu tiên cao (complete / need_finish) ngắt voice thấp (drag / question),
-// nhưng nếu voice đang phát có priority >= mới thì bỏ qua.
-let currentVoice: Phaser.Sound.BaseSound | null = null;
-let currentVoiceKey: string | null = null;
-
-function getVoicePriority(key: string): number {
-  // Ưu tiên thấp: drag / câu hỏi
-  if (key.startsWith("drag_") || key.startsWith("q_")) return 1;
-  // Trung bình: đúng / sai
-  if (key === "correct" || key === "wrong") return 2;
-  // Cao: need_finish
-  if (key === "voice_need_finish") return 3;
-  // Cao nhất: complete
-  if (key === "voice_complete") return 4;
-  // Mặc định
-  return 1;
-}
-
-export function playVoiceLocked(
-  sound: Phaser.Sound.BaseSoundManager,
-  key: string
-): void {
-  const newPri = getVoicePriority(key);
-  const curPri = currentVoiceKey ? getVoicePriority(currentVoiceKey) : 0;
-
-  // Nếu đang có voice chạy với priority >= mới thì bỏ qua (không chồng)
-  if (currentVoice && currentVoice.isPlaying && curPri >= newPri) {
-    return;
-  }
-
-  // Nếu voice mới ưu tiên cao hơn thì dừng voice cũ trước
-  if (currentVoice && currentVoice.isPlaying && curPri < newPri) {
-    currentVoice.stop();
-    currentVoice = null;
-    currentVoiceKey = null;
-  }
-
-  let instance = sound.get(key) as Phaser.Sound.BaseSound | null;
-  if (!instance) {
-    try {
-      instance = sound.add(key);
-    } catch (e) {
-      console.warn(`[CompareGame] Không phát được audio key="${key}":`, e);
-      return;
-    }
-  }
-  if (!instance) return;
-
-  currentVoice = instance;
-  currentVoiceKey = key;
-  instance.once("complete", () => {
-    if (currentVoice === instance) {
-      currentVoice = null;
-      currentVoiceKey = null;
-    }
-  });
-  instance.play();
-}
-
 // gắn lên window cho các scene dùng
 (Object.assign(window as any, {
   setRandomIntroViewportBg,
   setRandomGameViewportBg,
   setRandomEndViewportBg,
   setGameButtonsVisible,
-  playVoiceLocked, // 👈
+  playVoiceLocked,
 }));
 
 function setupHtmlButtons() {

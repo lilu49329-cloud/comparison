@@ -42,6 +42,9 @@ type BalanceInitData = {
   subject: Subject;
   // nhân vật ở màn chính đang cầm ÍT đồ hơn (để biết ai cần được thêm bóng/hoa)
   lessCharacter: 'GIRL' | 'BOY';
+  nextScene?: string;
+  score?: number;
+  levelIndex?: number;
 };
 
 export default class BalanceScene extends Phaser.Scene {
@@ -64,6 +67,9 @@ export default class BalanceScene extends Phaser.Scene {
   private girlSide: 'LEFT' | 'RIGHT' = 'LEFT';
   private boySide: 'LEFT' | 'RIGHT' = 'RIGHT';
   private upgradeCharacter: 'GIRL' | 'BOY' = 'GIRL';
+  private nextSceneKey = 'GameScene';
+  private score = 0;
+  private levelIndex = 0;
 
   constructor() {
     super('BalanceScene');
@@ -72,6 +78,9 @@ export default class BalanceScene extends Phaser.Scene {
   init(data: BalanceInitData) {
     this.subject = data.subject ?? 'BALLOON';
     this.upgradeCharacter = data.lessCharacter ?? 'GIRL';
+    this.nextSceneKey = data.nextScene ?? 'GameScene';
+    this.score = data.score ?? 0;
+    this.levelIndex = data.levelIndex ?? 0;
   }
 
   create() {
@@ -361,6 +370,14 @@ export default class BalanceScene extends Phaser.Scene {
             if (gameScene) {
               gameScene.subgameDone = true;
             }
+
+            // tự động chuyển sang màn chính tiếp theo sau khi hoàn thành màn phụ
+            this.time.delayedCall(1500, () => {
+              this.scene.start(this.nextSceneKey, {
+                score: this.score,
+                levelIndex: this.levelIndex + 1,
+              });
+            });
           },
         });
       } else {
