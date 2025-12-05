@@ -119,6 +119,53 @@ let isRotateOverlayActive = false; // trạng thái overlay xoay ngang
 // Lưu lại BGM loop + question đang phát khi bước vào overlay dọc
 let pausedLoopKeys: string[] = [];
 let pendingQuestionKey: string | null = null;
+let pausedSceneKeys: string[] = [];
+
+// Hook toàn cục để chặn âm thanh mới khi đang màn dọc,
+// chỉ cho phép phát riêng voice_rotate. Các sound bị chặn
+// được xếp hàng để phát lại khi quay ngang.
+let soundPlayPatched = false;
+function patchGlobalSoundPlay() {
+  if (soundPlayPatched) return;
+  const SoundNS: any = (Phaser as any).Sound;
+  if (!SoundNS || !SoundNS.BaseSoundManager) return;
+
+  const BaseMgr = SoundNS.BaseSoundManager;
+  const proto = BaseMgr.prototype;
+  if (!proto || typeof proto.play !== "function") return;
+
+  const originalPlay = proto.play;
+  proto.play = function (
+    key: string | Phaser.Types.Sound.SoundConfig,
+    config?: Phaser.Types.Sound.SoundConfig
+  ) {
+    const k = typeof key === "string" ? key : (key as any)?.key;
+
+    // Khi overlay xoay dọc đang bật: block tất cả sound mới trừ voice_rotate
+    if (isRotateOverlayActive && typeof k === "string" && k !== "voice_rotate") {
+      // Nếu là BGM loop thì nhớ để phát lại sau
+      const willLoop =
+        (config && config.loop) ||
+        (typeof (this as any).loop === "boolean" && (this as any).loop) ||
+        k === "bgm_main";
+      if (willLoop && !pausedLoopKeys.includes(k)) {
+        pausedLoopKeys.push(k);
+      }
+
+      // Nếu là câu hỏi thì phát lại sau khi quay ngang
+      if (k.startsWith("q_")) {
+        pendingQuestionKey = k;
+      }
+
+      return null;
+    }
+
+    return originalPlay.call(this, key, config);
+  };
+
+  soundPlayPatched = true;
+}
+
 
 function getVoicePriority(key: string): number {
   // Ưu tiên thấp: drag / câu hỏi
@@ -187,8 +234,8 @@ export function playVoiceLocked(
 }
 
 // Cố gắng resume AudioContext khi overlay bật/tắt
-function resumeSoundContext(gameScene: GameScene) {
-  const sm = gameScene.sound as any;
+function resumeSoundContext(scene: Phaser.Scene) {
+  const sm = scene.sound as any;
   const ctx: AudioContext | undefined = sm.context || sm.audioContext;
   if (ctx && ctx.state === "suspended" && typeof ctx.resume === "function") {
     ctx.resume();
@@ -249,17 +296,38 @@ function updateRotateHint() {
 
   rotateOverlay.style.display = shouldShow ? "flex" : "none";
 
-  const gameScene = game?.scene?.getScene("GameScene") as GameScene | undefined;
-  if (!gameScene || !gameScene.sound) {
+  const sceneManager = game?.scene;
+  const audioScene =
+    (sceneManager?.getScene("GameScene") as Phaser.Scene | undefined) ??
+    (sceneManager?.getScene("PreloadScene") as Phaser.Scene | undefined);
+
+  if (!audioScene || !audioScene.sound) {
     return;
   }
 
-  const soundManager = gameScene.sound as any;
+  const soundManager = audioScene.sound as any;
   const sounds = soundManager.sounds as Phaser.Sound.BaseSound[] | undefined;
 
   // Khi vừa bước vào màn hình dọc (overlay bật)
   if (overlayTurnedOn && Array.isArray(sounds)) {
-    resumeSoundContext(gameScene);
+    // Tạm dừng toàn bộ game loop để game không tiếp tục chạy nền
+    if (game && !game.loop.sleep) {
+      // no-op: phòng trường hợp loop không hỗ trợ sleep (fallback an toàn)
+    } else if (game) {
+      
+      game.loop.sleep();
+    }
+    // Tạm dừng các scene gameplay để game không chạy nền
+    pausedSceneKeys = [];
+    ["GameScene", "BalanceScene", "EndGameScene"].forEach((key) => {
+      const s = sceneManager?.getScene(key);
+      if (s && s.scene.isActive()) {
+        s.scene.pause();
+        pausedSceneKeys.push(key);
+      }
+    });
+
+    resumeSoundContext(audioScene);
 
     pausedLoopKeys = [];
     pendingQuestionKey = null;
@@ -288,10 +356,10 @@ function updateRotateHint() {
   // Khi overlay bật lên lần đầu -> phát voice_rotate
   if (overlayTurnedOn) {
     const tryPlayVoiceRotate = () => {
-      const isActive = gameScene.scene.isActive();
-      const hasVoiceRotate = gameScene.sound.get("voice_rotate");
+      const isActive = audioScene.scene.isActive();
+      const hasVoiceRotate = audioScene.sound.get("voice_rotate");
       if (isActive && hasVoiceRotate) {
-        playVoiceLocked(gameScene.sound, "voice_rotate");
+        playVoiceLocked(audioScene.sound, "voice_rotate");
       } else {
         setTimeout(tryPlayVoiceRotate, 300);
       }
@@ -301,9 +369,26 @@ function updateRotateHint() {
 
   // Khi overlay tắt -> dừng voice_rotate, phát lại BGM + question nếu có
   if (overlayTurnedOff) {
-    resumeSoundContext(gameScene);
+    // Đánh thức lại game loop
+    if (game && !game.loop.wake) {
+      // no-op
+    } else if (game) {
 
-    const rotateSound = gameScene.sound.get(
+      game.loop.wake();
+    }
+
+    // Resume lại các scene gameplay đã pause
+    pausedSceneKeys.forEach((key) => {
+      const s = sceneManager?.getScene(key);
+      if (s && s.scene.isPaused()) {
+        s.scene.resume();
+      }
+    });
+    pausedSceneKeys = [];
+
+    resumeSoundContext(audioScene);
+
+    const rotateSound = audioScene.sound.get(
       "voice_rotate"
     ) as Phaser.Sound.BaseSound | null;
     if (rotateSound && rotateSound.isPlaying) {
@@ -316,7 +401,7 @@ function updateRotateHint() {
 
     // Phát lại các BGM loop đã pause
     pausedLoopKeys.forEach((key) => {
-      const bg = gameScene.sound.get(key) as Phaser.Sound.BaseSound | null;
+      const bg = audioScene.sound.get(key) as Phaser.Sound.BaseSound | null;
       if (bg) {
         (bg as any).loop = true;
         bg.play();
@@ -326,7 +411,7 @@ function updateRotateHint() {
 
     // Phát lại question nếu có
     if (pendingQuestionKey) {
-      playVoiceLocked(gameScene.sound, pendingQuestionKey);
+      playVoiceLocked(audioScene.sound, pendingQuestionKey);
       pendingQuestionKey = null;
     }
   }
@@ -337,7 +422,27 @@ function setupRotateHint() {
   updateRotateHint();
   window.addEventListener("resize", updateRotateHint);
   window.addEventListener("orientationchange", updateRotateHint as any);
-}
+
+   // Khi người dùng chạm lần đầu trong trạng thái màn dọc,
+   // cố gắng phát lại voice_rotate (tránh bị chặn autoplay)
+  window.addEventListener("pointerdown", () => {
+      if (!isRotateOverlayActive || !game) return;
+
+      const sceneManager = game.scene;
+      const audioScene =
+        (sceneManager.getScene("GameScene") as Phaser.Scene | undefined) ??
+        (sceneManager.getScene("PreloadScene") as Phaser.Scene | undefined);
+
+      if (!audioScene || !audioScene.sound) return;
+
+      resumeSoundContext(audioScene);
+      try {
+        playVoiceLocked(audioScene.sound, "voice_rotate");
+      } catch (e) {
+        console.warn("[CompareGame] Không phát được voice_rotate sau pointerdown:", e);
+      }
+    });
+  }
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -475,6 +580,8 @@ async function initGame() {
   if (!game) {
     // setRandomIntroViewportBg();
     game = new Phaser.Game(config);
+    // Đảm bảo hook chặn âm thanh khi xoay dọc được bật
+    patchGlobalSoundPlay();
     setupHtmlButtons();
     setupPhaserResize(game);
     setupRotateHint();

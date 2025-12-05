@@ -1,73 +1,102 @@
-# React + TypeScript + Vite
+# Comparison Game – So sánh số lượng bóng & hoa
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+`comparison-game` là một mini game học toán cho trẻ em, xây dựng bằng **Phaser 3 + TypeScript + Vite**.  
+Trẻ sẽ so sánh số lượng bóng hoặc hoa ở hai bạn nhỏ và chọn bên “nhiều hơn” hoặc “ít hơn” theo câu hỏi tiếng Việt và voice hướng dẫn.
 
-Currently, two official plugins are available:
+## 1. Gameplay
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Mỗi màn chơi hiển thị:
+  - Một bạn gái và một bạn trai.
+  - Bóng hoặc hoa trên mỗi bên.
+  - Banner câu hỏi, ví dụ:
+    - “BẠN NÀO CẦM NHIỀU BÓNG HƠN?”
+    - “BÊN NÀO CÓ ÍT HOA HƠN?”
+- Trẻ chạm / click chọn bên trái hoặc bên phải:
+  - Đúng: hiện nút đúng/sai, phát `sfx_correct` + voice `correct`, sau đó chuyển sang màn phụ làm cân bằng (BalanceScene).
+  - Sai: phát `sfx_wrong` + voice `wrong`, hiện nút sai và cho chọn lại.
+- Hoàn thành đủ số màn sẽ chuyển tới màn kết thúc (EndGameScene) với feedback tổng.
 
-## React Compiler
+Các scene chính trong `src/`:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- `PreloadScene.ts`: preload hình, âm thanh (bgm, sfx, voice) và chuyển vào `GameScene`.
+- `GameScene.ts`: màn chính, hiển thị câu hỏi, hai nhân vật và xử lý chọn đáp án.
+- `BalanceScene.ts`: màn phụ sau khi trả lời đúng, cân bằng số lượng bóng/hoa.
+- `EndGameScene.ts`: màn kết thúc, hiển thị kết quả và nút chơi lại / tiếp tục.
+- `OverlayScene.ts`: overlay/khung ngoài nếu được sử dụng.
+- `main.ts`: khởi tạo Phaser game, cấu hình canvas, background HTML, gắn `playVoiceLocked` và logic nút HTML `btn-replay`, `btn-next`.
 
-## Expanding the ESLint configuration
+## 2. Chạy dự án
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Yêu cầu:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js LTS (khuyến nghị >= 18)
+- npm
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Cài dependency:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd comparison-game
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Chạy dev server:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+- Mặc định dùng **Vite (rolldown-vite)**, hỗ trợ HMR.
+- Mở URL do Vite in ra (thường là `http://localhost:5173`).
+
+Build production:
+
+```bash
+npm run build
+```
+
+Xem thử bản build:
+
+```bash
+npm run preview
+```
+
+## 3. Cấu trúc thư mục chính
+
+- `index.html`  
+  Canvas và các nút HTML bên ngoài game (`btn-replay`, `btn-next`), được `main.ts` gắn sự kiện.
+- `public/assets`  
+  Ảnh nền, nhân vật, icon, nút bấm và file âm thanh:
+  - `bg/` – background cho intro, game, end.
+  - `char/` – sprite nhân vật và đồ vật.
+  - `button/` – nút chọn, replay, next…
+  - `audio/` – `bgm_main.ogg`, `sfx_correct.ogg`, `sfx_wrong.ogg`, `voice_*`, `correct.ogg`, `wrong.ogg`, v.v.
+- `src/`  
+  Tất cả code TypeScript của game:
+  - `GameScene.ts`, `BalanceScene.ts`, `EndGameScene.ts`, `PreloadScene.ts`, `OverlayScene.ts`
+  - `types.ts` – định nghĩa `LevelConfig`, `CompareMode`.
+  - `main.ts` – entrypoint Vite, cấu hình Phaser, gắn helper vào `window`.
+
+## 4. Kỹ thuật & thư viện
+
+- **Phaser 3** (`phaser`): engine 2D cho toàn bộ gameplay.
+- **TypeScript**: type-safe cho scene, cấu hình level, v.v.
+- **Vite + React plugin**:
+  - Dự án khởi tạo từ template React + Vite, nhưng phần game hiện tại dùng Phaser thuần trong `main.ts` và các scene; React không bắt buộc để chạy game.
+- **ESLint**:
+  - Cấu hình trong `eslint.config.js`, dùng `@eslint/js`, `typescript-eslint` và một số plugin React mặc định từ template.
+  - Có thể chạy lint bằng:
+
+    ```bash
+    npm run lint
+    ```
+
+## 5. Tuỳ biến / mở rộng
+
+- Thêm level:
+  - Chỉnh logic sinh `levels` trong `GameScene.ts`.
+  - Cập nhật số lượng level khi truyền `total` cho `EndGameScene` trong `GameScene.ts`/`main.ts` nếu cần.
+- Đổi âm thanh:
+  - Thay file trong `public/assets/audio` nhưng giữ nguyên key trong code (`correct`, `wrong`, `sfx_correct`, `sfx_wrong`, `voice_*`).
+- Thay hình nhân vật / đồ vật:
+  - Cập nhật file trong `public/assets/char` và mapping key texture trong `GameScene.ts` / `BalanceScene.ts`.
+

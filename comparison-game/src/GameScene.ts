@@ -203,8 +203,8 @@ export default class GameScene extends Phaser.Scene {
       el.style.backgroundSize = 'contain';
     };
 
-    setBtnBgFromUrl(replayBtnEl, '/assets/button/replay.webp');
-    setBtnBgFromUrl(nextBtnEl, '/assets/button/next.webp');
+    setBtnBgFromUrl(replayBtnEl, 'assets/button/replay.webp');
+    setBtnBgFromUrl(nextBtnEl, 'assets/button/next.webp');
 
     const boardX = (width - BOARD_WIDTH) / 2;
     const boardY = BOARD_TOP_Y;
