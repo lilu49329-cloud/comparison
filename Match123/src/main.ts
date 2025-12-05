@@ -208,8 +208,8 @@ export function playVoiceLocked(
 }
 
 // Cố gắng resume AudioContext khi overlay bật/tắt
-function resumeSoundContext(gameScene: GameScene) {
-  const sm = gameScene.sound as any;
+function resumeSoundContext(scene: Phaser.Scene) {
+  const sm = scene.sound as any;
   const ctx: AudioContext | undefined = sm.context || sm.audioContext;
   if (ctx && ctx.state === "suspended" && typeof ctx.resume === "function") {
     ctx.resume();
@@ -270,47 +270,57 @@ function updateRotateHint() {
 
   rotateOverlay.style.display = shouldShow ? "flex" : "none";
 
-  const gameScene = game?.scene?.getScene("GameScene") as GameScene | undefined;
-  if (!gameScene || !gameScene.sound) {
+  const sceneManager = game?.scene;
+  const gameScene = sceneManager?.getScene("GameScene") as GameScene | undefined;
+  const overlayScene = sceneManager?.getScene("OverlayScene") as Phaser.Scene | undefined;
+
+  const audioScenes: Phaser.Scene[] = [];
+  if (gameScene && gameScene.sound) audioScenes.push(gameScene);
+  if (overlayScene && overlayScene.sound) audioScenes.push(overlayScene);
+
+  if (audioScenes.length === 0) {
     return;
   }
 
-  const soundManager = gameScene.sound as any;
-  const sounds = soundManager.sounds as Phaser.Sound.BaseSound[] | undefined;
-
   // Khi vừa bước vào màn hình dọc (overlay bật)
-  if (overlayTurnedOn && Array.isArray(sounds)) {
-    resumeSoundContext(gameScene);
-
+  if (overlayTurnedOn) {
     pausedLoopKeys = [];
     pendingQuestionKey = null;
 
-    sounds.forEach((snd: Phaser.Sound.BaseSound) => {
-      if (
-        snd &&
-        typeof snd.key === "string" &&
-        snd.key !== "voice_rotate" &&
-        snd.isPlaying &&
-        typeof snd.stop === "function"
-      ) {
-        if ((snd as any).loop) {
-          pausedLoopKeys.push(snd.key);
+    audioScenes.forEach((scene) => {
+      resumeSoundContext(scene);
+
+      const soundManager = scene.sound as any;
+      const sounds = soundManager.sounds as Phaser.Sound.BaseSound[] | undefined;
+      if (!Array.isArray(sounds)) return;
+
+      sounds.forEach((snd: Phaser.Sound.BaseSound) => {
+        if (
+          snd &&
+          typeof snd.key === "string" &&
+          snd.key !== "voice_rotate" &&
+          snd.isPlaying &&
+          typeof snd.stop === "function"
+        ) {
+          if ((snd as any).loop && !pausedLoopKeys.includes(snd.key)) {
+            pausedLoopKeys.push(snd.key);
+          }
+          if (!pendingQuestionKey && snd.key.startsWith("q_")) {
+            pendingQuestionKey = snd.key;
+          }
+          snd.stop();
         }
-        if (snd.key.startsWith("q_")) {
-          pendingQuestionKey = snd.key;
-        }
-        snd.stop();
-      }
+      });
     });
   }
 
   // Khi overlay bật lên lần đầu -> phát voice_rotate (nếu có)
   if (overlayTurnedOn) {
     const tryPlayVoiceRotate = () => {
-      // gameScene có thể bị stop/start lại, nên lấy lại mỗi lần
-      const scene = game?.scene?.getScene("GameScene") as
-        | GameScene
-        | undefined;
+      const sm2 = game?.scene;
+      const scene =
+        (sm2?.getScene("GameScene") as GameScene | undefined) ??
+        (sm2?.getScene("OverlayScene") as Phaser.Scene | undefined);
       if (!scene || !scene.sound) return;
 
       const isActive = scene.scene.isActive();
@@ -320,7 +330,6 @@ function updateRotateHint() {
       if (isActive && hasVoiceRotate) {
         playVoiceLocked(scene.sound, "voice_rotate");
       } else {
-        // Nếu chưa sẵn sàng (scene chưa active hoặc sound chưa load) thì thử lại sau
         setTimeout(tryPlayVoiceRotate, 300);
       }
     };
@@ -329,9 +338,18 @@ function updateRotateHint() {
 
   // Khi overlay tắt -> dừng voice_rotate, phát lại BGM + question nếu có
   if (overlayTurnedOff) {
-    resumeSoundContext(gameScene);
+    const sm2 = game?.scene;
+    const sceneForAudio =
+      (sm2?.getScene("GameScene") as GameScene | undefined) ??
+      (sm2?.getScene("OverlayScene") as Phaser.Scene | undefined);
 
-    const rotateSound = gameScene.sound.get(
+    if (!sceneForAudio || !sceneForAudio.sound) {
+      return;
+    }
+
+    resumeSoundContext(sceneForAudio);
+
+    const rotateSound = sceneForAudio.sound.get(
       "voice_rotate"
     ) as Phaser.Sound.BaseSound | null;
     if (rotateSound && rotateSound.isPlaying) {
@@ -343,7 +361,7 @@ function updateRotateHint() {
     }
 
     pausedLoopKeys.forEach((key) => {
-      const bg = gameScene.sound.get(key) as Phaser.Sound.BaseSound | null;
+      const bg = sceneForAudio.sound.get(key) as Phaser.Sound.BaseSound | null;
       if (bg) {
         (bg as any).loop = true;
         bg.play();
@@ -352,7 +370,7 @@ function updateRotateHint() {
     pausedLoopKeys = [];
 
     if (pendingQuestionKey) {
-      playVoiceLocked(gameScene.sound, pendingQuestionKey);
+      playVoiceLocked(sceneForAudio.sound, pendingQuestionKey);
       pendingQuestionKey = null;
     }
   }
@@ -363,6 +381,25 @@ function setupRotateHint() {
   updateRotateHint();
   window.addEventListener("resize", updateRotateHint);
   window.addEventListener("orientationchange", updateRotateHint as any);
+
+  // Khi người dùng chạm lần đầu trong trạng thái màn dọc,
+  // cố gắng phát lại voice_rotate (tránh bị chặn autoplay)
+  window.addEventListener("pointerdown", () => {
+    if (!isRotateOverlayActive || !game) return;
+
+    const sm = game.scene;
+    const scene =
+      (sm.getScene("GameScene") as GameScene | undefined) ??
+      (sm.getScene("OverlayScene") as Phaser.Scene | undefined);
+    if (!scene || !scene.sound) return;
+
+    resumeSoundContext(scene);
+    try {
+      playVoiceLocked(scene.sound, "voice_rotate");
+    } catch {
+      // ignore lỗi phát âm do hạn chế trình duyệt
+    }
+  });
 }
 
 // Cho các Scene gọi qua window
