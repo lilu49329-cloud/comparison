@@ -26,6 +26,9 @@ export default class OverlayScene extends Phaser.Scene {
     const width = this.scale.width;
     const height = this.scale.height;
 
+    // Mỗi lần quay lại OverlayScene cho phép bấm Start lại
+    this._started = false;
+
     const DESIGN_W = 2160;
     const DESIGN_H = 1620;
     const uiScale = Math.min(width / DESIGN_W, height / DESIGN_H);

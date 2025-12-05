@@ -44,25 +44,7 @@ export default class EndGameScene extends Phaser.Scene {
     const BG_KEYS = ["bg_end1", "bg_end2"];
     const chosenBG = Phaser.Utils.Array.GetRandom(BG_KEYS);
 
-    // const DESIGN_W = 2160;
-    // const DESIGN_H = 1620;
-    // const SAFE_TOP = 230;
-    // const SAFE_BOTTOM = 260;
-
-    // const AOI_TOP = SAFE_TOP;
-    // const AOI_BOTTOM = DESIGN_H - SAFE_BOTTOM;
-    // const AOI_CENTER = (AOI_TOP + AOI_BOTTOM) / 2;
-
-    // const scaleBG = Math.max(width / DESIGN_W, height / DESIGN_H);
-
-    // const bg = this.add
-    //   .image(width / 2, 0, chosenBG)
-    //   .setOrigin(0.5, 0)
-    //   .setScale(scaleBG);
-
-    // const AOI_center_scaled = AOI_CENTER * scaleBG;
-    // const screenCenterY = height / 2;
-    // bg.y = screenCenterY - AOI_center_scaled;
+    
 	    const DESIGN_W = 2160;
     const DESIGN_H = 1620;
 

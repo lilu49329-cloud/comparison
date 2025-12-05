@@ -810,6 +810,8 @@ export default class GameScene extends Phaser.Scene {
           } else {
             this.sound.play("sfx_wrong");
           }
+
+          this.sound.play("wrong");
         }
 
         if (n === objN && !this.matches[startIndex]) {
@@ -824,6 +826,8 @@ export default class GameScene extends Phaser.Scene {
           } else {
             this.sound.play("sfx_correct");
           }
+
+          this.sound.play("correct");
 
           startCard.clearTint();
           objCard.clearTint();
@@ -888,6 +892,16 @@ export default class GameScene extends Phaser.Scene {
           } else {
             this.sound.play("voice_complete");
           }
+
+          // Tự động chuyển màn sau khi phát âm hoàn thành
+          this.time.delayedCall(1500, () => {
+            const nextIndex = this.level + 1;
+            if (nextIndex >= this.levels.length) {
+              this.scene.start("EndGameScene");
+            } else {
+              this.scene.restart({ level: nextIndex });
+            }
+          });
         });
       }
     });

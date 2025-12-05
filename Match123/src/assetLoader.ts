@@ -31,13 +31,15 @@ export function preloadIntroAssets(scene: Phaser.Scene): void {
 export function preloadGameAssets(scene: Phaser.Scene): void {
   // --- AUDIO ---
   scene.load.audio("voice_intro", "assets/audio/voice_intro.ogg");
-  scene.load.audio("voice_complete", "assets/audio/voice_complete.ogg");
+  scene.load.audio("voice_complete", "assets/audio/complete.ogg");
   scene.load.audio("voice_need_finish", "assets/audio/voice_need_finish.ogg");
   scene.load.audio("sfx_correct", "assets/audio/sfx_correct.ogg");
   scene.load.audio("sfx_wrong", "assets/audio/sfx_wrong.ogg");
   scene.load.audio("bgm_main", "assets/audio/bgm_main.ogg");
   scene.load.audio("voice_end", "assets/audio/voice_end.ogg");
   scene.load.audio("voice_rotate", "assets/audio/xoay.ogg");
+  scene.load.audio("correct", "assets/audio/correct.ogg");
+  scene.load.audio("wrong", "assets/audio/error.ogg");
 
   // --- BACKGROUND ---
   scene.load.image("bg1", "assets/bg/bg1.webp");
