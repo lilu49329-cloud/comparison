@@ -310,6 +310,12 @@ export default class GameScene extends Phaser.Scene {
     }
     this.bgm = bgm;
 
+    // ===== VOICE INTRO – chỉ phát 1 lần ở level đầu =====
+    const introPlayed = (window as any)._voiceIntroPlayed as boolean | undefined;
+    if (!introPlayed && this.level === 0) {
+      (window as any)._voiceIntroPlayed = true;
+      this.sound.play("voice_intro");
+    }
     // Khởi tạo hiệu ứng âm thanh để tránh lặp / chồng khi spam click
     this.sfxWrong = this.sound.add("sfx_wrong");
     this.sfxCorrect = this.sound.add("sfx_correct");
@@ -797,6 +803,8 @@ export default class GameScene extends Phaser.Scene {
           if (this.sfxWrong && !this.sfxWrong.isPlaying) {
             this.sfxWrong.play();
           }
+          // Voice “sai rồi” chạy song song với sfx_wrong
+          this.sound.play("wrong");
         }
 
         if (n === objN && !this.matches[startIndex]) {
@@ -806,6 +814,8 @@ export default class GameScene extends Phaser.Scene {
           if (this.sfxCorrect && !this.sfxCorrect.isPlaying) {
             this.sfxCorrect.play();
           }
+          // Voice “đúng rồi” chạy song song với sfx_correct
+          this.sound.play("correct");
 
           startCard.clearTint();
           objCard.clearTint();
@@ -861,8 +871,19 @@ export default class GameScene extends Phaser.Scene {
       this.dragStartIdx = null;
 
       if (this.matches.every((m) => m)) {
-        this.time.delayedCall(2000, () => {
+        this.time.delayedCall(1000, () => {
+          // Phát voice hoàn thành
           this.sound.play("voice_complete");
+
+          // Đợi thêm rồi tự động chuyển màn
+          this.time.delayedCall(1500, () => {
+            const nextIndex = this.level + 1;
+            if (nextIndex >= this.levels.length) {
+              this.scene.start("EndGameScene");
+            } else {
+              this.scene.restart({ level: nextIndex });
+            }
+          });
         });
       }
     });
