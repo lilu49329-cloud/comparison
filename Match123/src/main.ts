@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import OverlayScene from "./OverlayScene";
+//import OverlayScene from "./OverlayScene";
 import GameScene from "./GameScene";
 import EndGameScene from "./EndGameScene";
 
@@ -426,7 +426,7 @@ const config: Phaser.Types.Core.GameConfig = {
     pixelArt: false,
     antialias: true,
   },
-  scene: [OverlayScene, GameScene, EndGameScene],
+  scene: [GameScene, EndGameScene],
 };
 
 // ================== KẾT NỐI NÚT HTML (ngoài Phaser) ==================
@@ -514,7 +514,7 @@ async function initGame() {
   }
 
   if (!game) {
-    setRandomIntroViewportBg();
+    // setRandomIntroViewportBg();
     game = new Phaser.Game(config);
     setupHtmlButtons();
     setupPhaserResize(game);

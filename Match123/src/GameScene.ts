@@ -316,6 +316,13 @@ export default class GameScene extends Phaser.Scene {
     }
     this.bgm = bgm;
 
+    // ===== VOICE INTRO – chỉ phát 1 lần ở level đầu =====
+    const introPlayed = (window as any)._voiceIntroPlayed as boolean | undefined;
+    if (!introPlayed && this.level === 0) {
+      (window as any)._voiceIntroPlayed = true;
+      this.sound.play("voice_intro");
+    }
+
     const level = this.levels[this.level];
 
     // Random background viewport cho màn game (ngoài canvas)
