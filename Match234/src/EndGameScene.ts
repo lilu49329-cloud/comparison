@@ -1,96 +1,222 @@
 import Phaser from "phaser";
 
+function hideGameButtons() {
+  (window as any).setGameButtonsVisible?.(false);
+}
+
+
+type DifficultyLevel = 1 | 2 | 3;
+
 export default class EndGameScene extends Phaser.Scene {
-  // private bgm?: Phaser.Sound.BaseSound;
-  constructor() {
-    super({ key: "EndGameScene" });
-  }
-  
-  preload(): void {
-    // Tất cả asset (bg_end1/2, replay_endgame, exit_endgame, bgm, voice_end)
-    // đã được load trong preloadGameAssets ở assetLoader.ts
-  }
+    private lessonId!: string;
+    private difficulty: DifficultyLevel = 3;
+    private containerEl: HTMLElement | null = null;
+    private confettiEvent?: Phaser.Time.TimerEvent;
 
-  create(): void {
-	// Ẩn nút viewport ở màn endgame
-    (window as any).setGameButtonsVisible?.(false);
-
-    // Random background viewport cho màn endgame (ngoài canvas)
-    (window as any).setRandomEndViewportBg?.();
-
-    const cam = this.cameras.main;
-    const width = cam.width;
-    const height = cam.height;
-
-    // KHÔNG setBackgroundColor để canvas giữ trong suốt
-    // cam.setBackgroundColor("#ffffff");
-
-    // Nhạc nền
-    let bgm = this.sound.get("bgm_main");
-    if (!bgm) {
-      bgm = this.sound.add("bgm_main", { loop: true, volume: 0.28 });
-      bgm.play();
-    } else if (!bgm.isPlaying) {
-      bgm.play();
-    }
-    // this.bgm = bgm;
-
-    // Voice kết thúc
-    if (this.sound && this.sound.play) {
-      this.sound.play("voice_end", { volume: 1 });
+    constructor() {
+        super('EndGameScene');
     }
 
-    // Panel endgame (bg_end1 / bg_end2) vẽ trong canvas
-    const BG_KEYS = ["bg_end1", "bg_end2"];
-    const chosenBG = Phaser.Utils.Array.GetRandom(BG_KEYS);
+    private clearDimBackground() {
+        if (this.containerEl) {
+            this.containerEl.classList.remove('dim-overlay');
+            this.containerEl.classList.remove('dim-filter');
+        }
+    }
 
-    
-	    const DESIGN_W = 2160;
-    const DESIGN_H = 1620;
+    init(data: {
+        lessonId: string;
+        score: number;
+        total: number;
+        difficulty?: DifficultyLevel;
+    }) {
+        this.lessonId = data.lessonId;
+        this.difficulty = data.difficulty ?? 3;
+    }
 
-    // Thu nhỏ panel để luôn nằm trọn trong canvas, căn giữa
-    const panelMaxW = width * 1.2;
-    const panelMaxH = height * 1.2;
+    create() {
+        const w = this.scale.width;
+        const h = this.scale.height;
 
-    const scaleBG = Math.min(panelMaxW / DESIGN_W, panelMaxH / DESIGN_H);
+        (this.scene.get('CompareScene') as any)?.stopAllVoices?.();
 
-    const bg = this.add
-      .image(width / 2, height / 2 - height * 0.04, chosenBG)
-      .setOrigin(0.5, 0.5)
-      .setScale(scaleBG);
+        this.sound.play('complete');
 
+        this.containerEl = document.getElementById('game-container');
+        if (this.containerEl) {
+            this.containerEl.classList.add('dim-overlay');
+        }
 
-    const bottomOfPanelY = bg.getBottomCenter().y;
-    const BTN_FROM_BOTTOM_RATIO = 0.18;
-    const btnY = bottomOfPanelY - bg.displayHeight * BTN_FROM_BOTTOM_RATIO;
+        this.time.delayedCall(2000, () => {
+            this.sound.play('fireworks');
+            this.sound.play('applause');
+        });
 
-    const BTN_OFFSET_X_RATIO = 0.12;
-    const btnOffsetX = bg.displayWidth * BTN_OFFSET_X_RATIO;
+        this.add
+            .image(w / 2, h / 2 - h * 0.12, 'banner_congrat')
+            .setOrigin(0.5)
+            .setDepth(100)
+            .setDisplaySize(w * 0.9, h * 0.9);
 
-    // Nút replay – asset "replay_endgame"
-    const replayBtn = this.add
-      .image(cam.centerX - btnOffsetX, btnY, "replay_endgame")
-      .setOrigin(0.5)
-      .setScale(0.75 * scaleBG)
-      .setInteractive({ useHandCursor: true });
+        if (this.textures.exists('icon_end')) {
+            const icon = this.add.image(w / 2, h / 2 - 150, 'icon_end');
+            icon.setScale(0.5);
+            icon.setDepth(1005);
+            this.tweens.add({
+                targets: icon,
+                y: icon.y - 10,
+                duration: 800,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut',
+            });
+            this.tweens.add({
+                targets: icon,
+                angle: { from: -5, to: 5 },
+                duration: 600,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut',
+            });
+        }
 
-    replayBtn.on("pointerdown", () => {
-      this.scene.start("GameScene", { level: 0 });
-    });
+        const btnScale = Math.min(w, h) / 1280;
+        const spacing = 250 * btnScale;
 
-    // Nút exit – asset "exit_endgame"
-    const exitBtn = this.add
-      .image(cam.centerX + btnOffsetX, btnY, "exit_endgame")
-      .setOrigin(0.5)
-      .setScale(0.75 * scaleBG)
-      .setInteractive({ useHandCursor: true });
+        const replayBtn = this.add
+            .image(w / 2 - spacing, h / 2 + h * 0.2, 'btn_reset')
+            .setOrigin(0.5)
+            .setScale(btnScale)
+            .setDepth(101)
+            .setInteractive({ useHandCursor: true });
 
-    exitBtn.on("pointerdown", () => {
-      const bgmNow = this.sound.get("bgm_main");
-      if (bgmNow && bgmNow.isPlaying) {
-        bgmNow.stop();
-      }
-      this.scene.start("OverlayScene");
-    });
-  }
+        replayBtn.on('pointerdown', () => {
+            this.sound.stopAll();
+            this.sound.play('sfx_click');
+            this.clearDimBackground();
+            this.stopConfetti();
+            this.scene.stop('EndGameScene');
+            this.scene.start('GameScene', {
+                lessonId: this.lessonId,
+                difficulty: this.difficulty,
+            });
+        });
+
+        const exitBtn = this.add
+            .image(w / 2 + spacing, h / 2 + h * 0.2, 'btn_exit')
+            .setOrigin(0.5)
+            .setScale(btnScale)
+            .setDepth(101)
+            .setInteractive({ useHandCursor: true });
+
+        exitBtn.on('pointerdown', () => {
+            this.sound.stopAll();
+            this.sound.play('sfx-click');
+            this.clearDimBackground();
+            this.stopConfetti();
+            this.scene.start('LessonSelectScene');
+            const host = (window as any).irukaHost;
+            const state = (window as any).irukaGameState || {};
+            if (host && typeof host.complete === 'function') {
+                const timeMs = state.startTime
+                    ? Date.now() - state.startTime
+                    : 0;
+                const score = state.currentScore || 0;
+                host.complete({
+                    score,
+                    timeMs,
+                    extras: {
+                        reason: 'user_exit',
+                    },
+                });
+            } else {
+                this.scene.start('LessonSelectScene');
+            }
+        });
+
+        [replayBtn, exitBtn].forEach((btn) => {
+            btn.on('pointerover', () => btn.setScale(btnScale * 1.1));
+            btn.on('pointerout', () => btn.setScale(btnScale));
+        });
+
+        hideGameButtons();
+        this.createConfettiEffect();
+    }
+
+    private createConfettiEffect(): void {
+        const width = this.cameras.main.width;
+        const colors = [
+            0xff6b6b, 0x4ecdc4, 0xffe66d, 0x95e1d3, 0xf38181, 0xaa96da,
+        ];
+        const shapes: Array<'circle' | 'rect'> = ['circle', 'rect'];
+        this.confettiEvent = this.time.addEvent({
+            delay: 100,
+            callback: () => {
+                if (!this.scene.isActive()) return;
+                for (let i = 0; i < 3; i++) {
+                    this.createConfettiPiece(
+                        Phaser.Math.Between(0, width),
+                        -20,
+                        Phaser.Utils.Array.GetRandom(colors),
+                        Phaser.Utils.Array.GetRandom(shapes)
+                    );
+                }
+            },
+            loop: true,
+        });
+    }
+
+    private createConfettiPiece(
+        x: number,
+        y: number,
+        color: number,
+        shape: 'circle' | 'rect'
+    ): void {
+        let confetti: Phaser.GameObjects.Arc | Phaser.GameObjects.Rectangle;
+        if (shape === 'circle') {
+            confetti = this.add.circle(
+                x,
+                y,
+                Phaser.Math.Between(4, 8),
+                color,
+                1
+            );
+        } else {
+            confetti = this.add.rectangle(
+                x,
+                y,
+                Phaser.Math.Between(6, 12),
+                Phaser.Math.Between(10, 20),
+                color,
+                1
+            );
+        }
+        confetti.setDepth(999);
+        confetti.setRotation((Phaser.Math.Between(0, 360) * Math.PI) / 180);
+        const duration = Phaser.Math.Between(3000, 5000);
+        const targetY = this.cameras.main.height + 50;
+        const drift = Phaser.Math.Between(-100, 100);
+        this.tweens.add({
+            targets: confetti,
+            y: targetY,
+            x: x + drift,
+            rotation: confetti.rotation + Phaser.Math.Between(2, 4) * Math.PI,
+            duration,
+            ease: 'Linear',
+            onComplete: () => confetti.destroy(),
+        });
+        this.tweens.add({
+            targets: confetti,
+            alpha: { from: 1, to: 0.3 },
+            duration,
+            ease: 'Cubic.easeIn',
+        });
+    }
+
+    private stopConfetti(): void {
+        if (this.confettiEvent) {
+            this.confettiEvent.remove(false);
+            this.confettiEvent = undefined;
+        }
+    }
 }

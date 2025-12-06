@@ -113,7 +113,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 function buildOneTwoLevels(): LevelConfig[] {
   // Dùng cùng 4 asset cho nhiều màn, mỗi màn đổi pattern số và trộn thứ tự
-  const bgKeys = ["bg1", "bg2", "bg3"];
+  const bgKeys = ["bg1", "bg2", "bg3","bg4","bg5"];
   const charKeys = ["char", "char", "char"];
 
   const levels: LevelConfig[] = [];
@@ -901,7 +901,7 @@ export default class GameScene extends Phaser.Scene {
           }
 
           // Tự động chuyển màn sau khi phát âm hoàn thành
-          this.time.delayedCall(1500, () => {
+          this.time.delayedCall(800, () => {
             const nextIndex = this.level + 1;
             if (nextIndex >= this.levels.length) {
               this.scene.start("EndGameScene");

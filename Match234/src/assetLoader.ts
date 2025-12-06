@@ -29,7 +29,7 @@ export function preloadIntroAssets(scene: Phaser.Scene): void {
 
 // Load toàn bộ asset dùng trong game (GameScene + EndGameScene)
 export function preloadGameAssets(scene: Phaser.Scene): void {
-  // --- AUDIO ---
+   // --- AUDIO ---
   scene.load.audio("voice_intro", "assets/audio/voice_intro.ogg");
   scene.load.audio("voice_complete", "assets/audio/complete.ogg");
   scene.load.audio("voice_need_finish", "assets/audio/voice_need_finish.ogg");
@@ -40,6 +40,10 @@ export function preloadGameAssets(scene: Phaser.Scene): void {
   scene.load.audio("voice_rotate", "assets/audio/xoay.ogg");
   scene.load.audio("correct", "assets/audio/correct.ogg");
   scene.load.audio("wrong", "assets/audio/error.ogg");
+  scene.load.audio("complete", "assets/audio/vic_sound.ogg");
+  scene.load.audio("fireworks", "assets/audio/fireworks.ogg");
+  scene.load.audio("applause", "assets/audio/applause.ogg");
+  scene.load.audio("sfx_click", "assets/audio/click.ogg");
 
   // --- BACKGROUND ---
   scene.load.image("bg1", "assets/bg/bg1.webp");
@@ -77,8 +81,17 @@ export function preloadGameAssets(scene: Phaser.Scene): void {
 ;
 
   // --- BG END ---
-  scene.load.image("bg_end1", "assets/bg_end/bg_end1.webp");
-  scene.load.image("bg_end2", "assets/bg_end/bg_end2.webp");
+  scene.load.image("banner_congrat", "assets/bg_end/banner_congrat.webp");
+  scene.load.image("btn_exit", "assets/bg_end/btn_exit.webp");
+  scene.load.image("btn_reset", "assets/bg_end/btn_reset.webp");
+  scene.load.image("icon_end", "assets/bg_end/icon.webp");
+  scene.load.image("ic_1", "assets/bg_end/ic_1.webp");
+  scene.load.image("ic_2", "assets/bg_end/ic_2.webp");
+  scene.load.image("ic_3", "assets/bg_end/ic_3.webp");
+  scene.load.image("ic_4", "assets/bg_end/ic_4.webp");
+  scene.load.image("ic_6", "assets/bg_end/ic_6.webp");
+  scene.load.image("ic_7", "assets/bg_end/ic_7.webp");
+  scene.load.image("ic_8", "assets/bg_end/ic_8.webp");
 
 }
 
