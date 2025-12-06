@@ -74,10 +74,11 @@ const HAND_FINGER_ORIGIN_X = 0.8;
 const HAND_FINGER_ORIGIN_Y = 0.2;
 
 const ALL_ASSETS_12 = [
-  "chicken",
-  "pig",
-  "dog",
-  "cat",
+  "apple",
+  "orange",
+  "pumpkin",
+  "carrot",
+  "watermelon",
 ];
 
 const LABEL_BY_ASSET: Record<string, string> = {};
@@ -85,21 +86,19 @@ const LABEL_BY_ASSET: Record<string, string> = {};
 // Các mẫu số lượng cho 4 cột (bên trái là số, bên phải là đồ vật).
 // Đã thêm cả số 3 để có 3 nhóm đồ vật.
 const ONE_TWO_PATTERNS = [
-  // hai đồ vật
-  [2, 2, 3, 4],
-  [2, 3, 2, 4],
-  [2, 3, 4, 2],
+  [3, 3, 4, 5],
+  [3, 4, 3, 5],
+  [3, 4, 5, 3],
 
-  // ba đồ vật
-  [3, 2, 3, 4],
-  [3, 3, 2, 4],
-  [3, 4, 3, 2],
+  [4, 3, 4, 5],
+  [4, 4, 3, 5],
+  [4, 5, 4, 3],
 
-  // bốn đồ vật
-  [4, 2, 3, 4],
-  [4, 3, 4, 2],
-  [4, 4, 2, 3],
+  [5, 3, 4, 5],
+  [5, 4, 5, 3],
+  [5, 5, 3, 4],
 ];
+
 
 // ========== UTILS ==========
 function shuffle<T>(arr: T[]): T[] {
@@ -113,7 +112,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 function buildOneTwoLevels(): LevelConfig[] {
   // Dùng cùng 4 asset cho nhiều màn, mỗi màn đổi pattern số và trộn thứ tự
-  const bgKeys = ["bg1", "bg2", "bg3"];
+  const bgKeys = ["bg1", "bg2", "bg3", "bg4", "bg5"];
   const charKeys = ["char", "char", "char"];
 
   const levels: LevelConfig[] = [];
@@ -122,15 +121,16 @@ function buildOneTwoLevels(): LevelConfig[] {
   const numLevels = 3;
 
   for (let i = 0; i < numLevels; i++) {
-    const shuffledAssets = shuffle(ALL_ASSETS_12);
-    const pattern =
-      ONE_TWO_PATTERNS[Math.floor(Math.random() * ONE_TWO_PATTERNS.length)];
+  const shuffledAssets = shuffle(ALL_ASSETS_12).slice(0, 4);
+  const pattern =
+    ONE_TWO_PATTERNS[Math.floor(Math.random() * ONE_TWO_PATTERNS.length)];
 
-    const items: LevelItem[] = shuffledAssets.map((key, idx) => ({
-      number: pattern[idx],
-      asset: key,
-      label: LABEL_BY_ASSET[key] || "",
-    }));
+  const items: LevelItem[] = shuffledAssets.map((key, idx) => ({
+    number: pattern[idx],
+    asset: key,
+    label: LABEL_BY_ASSET[key] || "",
+  }));
+  // ...
 
     levels.push({
       items,
@@ -366,8 +366,8 @@ export default class GameScene extends Phaser.Scene {
     const charY = height - 10;
 
     const baseCharScale = height / 720;
-    scaleChar = baseCharScale * 0.33;
-    charX = width * 0.11;
+    scaleChar = baseCharScale * 0.55;
+    charX = width * 0.17;
 
         if (this.textures.exists(level.character)) {
           const charImg = this.add
@@ -901,7 +901,7 @@ export default class GameScene extends Phaser.Scene {
           }
 
           // Tự động chuyển màn sau khi phát âm hoàn thành
-          this.time.delayedCall(1500, () => {
+          this.time.delayedCall(800, () => {
             const nextIndex = this.level + 1;
             if (nextIndex >= this.levels.length) {
               this.scene.start("EndGameScene");

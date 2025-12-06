@@ -95,7 +95,8 @@ function setGameButtonsVisible(visible: boolean) {
     | null;
   const display = visible ? "block" : "none";
   if (replayBtn) replayBtn.style.display = display;
-  if (nextBtn) nextBtn.style.display = display;
+  // Luôn ẩn nút chuyển màn
+  if (nextBtn) nextBtn.style.display = "none";
 }
 
 // ================== CSS CHO CONTAINER (TRONG SUỐT) ==================
@@ -441,25 +442,13 @@ function setupHtmlButtons() {
     });
   }
 
-  const nextBtn = document.getElementById("btn-next");
+  // Ẩn hoàn toàn nút chuyển màn
+  const nextBtn = document.getElementById("btn-next") as
+    | HTMLButtonElement
+    | null;
   if (nextBtn) {
-    nextBtn.addEventListener("click", () => {
-      if (!game) return;
-      const scene = game.scene.getScene("GameScene") as GameScene;
-      if (!scene) return;
-
-      if (!scene.isLevelComplete()) {
-        playVoiceLocked(scene.sound, "voice_need_finish");
-        return;
-      }
-
-      const nextIndex = scene.level + 1;
-      if (nextIndex >= scene.levels.length) {
-        scene.scene.start("EndGameScene");
-      } else {
-        scene.scene.restart({ level: nextIndex });
-      }
-    });
+    nextBtn.style.display = "none";
+    nextBtn.replaceWith(nextBtn); // giữ DOM nhưng không gắn handler
   }
 
   // Mặc định ẩn nút (intro, endgame)

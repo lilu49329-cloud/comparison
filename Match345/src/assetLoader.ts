@@ -40,6 +40,10 @@ export function preloadGameAssets(scene: Phaser.Scene): void {
   scene.load.audio("voice_rotate", "assets/audio/xoay.ogg");
   scene.load.audio("correct", "assets/audio/correct.ogg");
   scene.load.audio("wrong", "assets/audio/error.ogg");
+  scene.load.audio("complete", "assets/audio/vic_sound.ogg");
+  scene.load.audio("fireworks", "assets/audio/fireworks.ogg");
+  scene.load.audio("applause", "assets/audio/applause.ogg");
+  scene.load.audio("sfx_click", "assets/audio/click.ogg");
 
   // --- BACKGROUND ---
   scene.load.image("bg1", "assets/bg/bg1.webp");
@@ -69,16 +73,26 @@ export function preloadGameAssets(scene: Phaser.Scene): void {
   scene.load.image("board", "assets/card/board.webp");
 
   // --- ICONS ---
-  scene.load.image("chicken", "assets/icon/chicken.webp");
-  scene.load.image("pig", "assets/icon/pig.webp");
-  scene.load.image("dog", "assets/icon/dog.webp");
-  scene.load.image("cat", "assets/icon/cat.webp");
+  scene.load.image("watermelon", "assets/icon/watermelon.webp");
+  scene.load.image("carrot", "assets/icon/carrot.webp");
+  scene.load.image("orange", "assets/icon/orange.webp");
+  scene.load.image("pumpkin", "assets/icon/pumpkin.webp");
+  scene.load.image("apple", "assets/icon/apple.webp");
   scene.load.image("hand", "assets/icon/hand.webp");
 ;
 
   // --- BG END ---
-  scene.load.image("bg_end1", "assets/bg_end/bg_end1.webp");
-  scene.load.image("bg_end2", "assets/bg_end/bg_end2.webp");
+  scene.load.image("banner_congrat", "assets/bg_end/banner_congrat.webp");
+  scene.load.image("btn_exit", "assets/bg_end/btn_exit.webp");
+  scene.load.image("btn_reset", "assets/bg_end/btn_reset.webp");
+  scene.load.image("icon_end", "assets/bg_end/icon.webp");
+  scene.load.image("ic_1", "assets/bg_end/ic_1.webp");
+  scene.load.image("ic_2", "assets/bg_end/ic_2.webp");
+  scene.load.image("ic_3", "assets/bg_end/ic_3.webp");
+  scene.load.image("ic_4", "assets/bg_end/ic_4.webp");
+  scene.load.image("ic_6", "assets/bg_end/ic_6.webp");
+  scene.load.image("ic_7", "assets/bg_end/ic_7.webp");
+  scene.load.image("ic_8", "assets/bg_end/ic_8.webp");
 
 }
 
