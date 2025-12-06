@@ -807,8 +807,10 @@ export default class GameScene extends Phaser.Scene {
 
         const objCard = objCardRaw;
         const objN = objCard.customData!.number;
+        const objAlreadyMatched = objCard.texture.key === "card_yellow2";
 
-        if (n !== objN && !this.matches[startIndex]) {
+        // Sai nếu số không khớp HOẶC thẻ vật đã được nối trước đó
+        if ((n !== objN || objAlreadyMatched) && !this.matches[startIndex]) {
           const playLocked = (window as any).playVoiceLocked as
             | ((s: Phaser.Sound.BaseSoundManager, k: string) => void)
             | undefined;
@@ -821,7 +823,8 @@ export default class GameScene extends Phaser.Scene {
           this.sound.play("wrong");
         }
 
-        if (n === objN && !this.matches[startIndex]) {
+        // Đúng chỉ khi số khớp và thẻ vật CHƯA được nối
+        if (n === objN && !objAlreadyMatched && !this.matches[startIndex]) {
           matched = true;
           this.matches[startIndex] = true;
 
