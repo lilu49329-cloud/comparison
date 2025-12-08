@@ -89,10 +89,16 @@ function setGameButtonsVisible(visible: boolean) {
   const nextBtn = document.getElementById("btn-next") as
     | HTMLButtonElement
     | null;
+
   const display = visible ? "block" : "none";
+
+  // Chỉ điều khiển nút replay
   if (replayBtn) replayBtn.style.display = display;
-  if (nextBtn) nextBtn.style.display = display;
+
+  // Nút next luôn tắt
+  if (nextBtn) nextBtn.style.display = "none";
 }
+
 
 // ================== CSS CHO CONTAINER (TRONG SUỐT) ==================
 if (container instanceof HTMLDivElement) {
@@ -484,7 +490,7 @@ function setupHtmlButtons() {
       if (balance && balance.scene.isActive()) {
         balance.scene.stop();
       }
-
+      
       // Replay lại toàn bộ level hiện tại (màn chính + màn phụ)
       gameScene.scene.restart({
         levelIndex: gameScene.levelIndex,

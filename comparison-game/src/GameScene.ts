@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import type { LevelConfig, CompareMode } from './types';
+import { playRandomVoice } from './audioUtils'; 
+
 
 type GameState =
   | 'SHOW_LEVEL'
@@ -121,6 +123,13 @@ export default class GameScene extends Phaser.Scene {
 
   private levelSubjects: Subject[] = [];
   private levelQuestions: string[] = [];
+
+  private correctVoices: string[] = [
+  'correct_1',
+  'correct_2',
+  'correct_3',
+  'correct_4',
+];
 
   // đánh dấu việc vào / hoàn thành màn phụ (BalanceScene) cho level hiện tại
   public subgameEntered = false;
@@ -434,7 +443,7 @@ export default class GameScene extends Phaser.Scene {
       this.score++;
       // dùng âm thanh thay cho text feedback
       this.sound.play('sfx_correct');
-      (window as any).playVoiceLocked(this.sound, 'correct');
+      playRandomVoice(this.sound, this.correctVoices);
 
       const chosenBtn = side === 'LEFT' ? this.leftBtn : this.rightBtn;
       const otherBtn = side === 'LEFT' ? this.rightBtn : this.leftBtn;
@@ -471,7 +480,6 @@ export default class GameScene extends Phaser.Scene {
       // dùng âm thanh thay cho text feedback
       
       this.sound.play('sfx_wrong');
-      (window as any).playVoiceLocked(this.sound, 'wrong');
 
       const chosenBtn = side === 'LEFT' ? this.leftBtn : this.rightBtn;
       chosenBtn.setTexture(ANSWER_WRONG);

@@ -35,11 +35,9 @@ export default class PreloadScene extends Phaser.Scene {
         this.load.audio('bgm_main', 'assets/audio/bgm_main.ogg');
         this.load.audio('sfx_click', 'assets/audio/click.ogg');
         this.load.audio('sfx_correct', 'assets/audio/correct.ogg');
-        this.load.audio('sfx_wrong', 'assets/audio/error.ogg');
+        this.load.audio('sfx_wrong', 'assets/audio/wrong.ogg');
         this.load.audio('voice_need_finish', 'assets/audio/finish.ogg');
         this.load.audio('voice_complete', 'assets/audio/complete.ogg');
-        this.load.audio('correct', 'assets/audio/sfx_correct.ogg');
-        this.load.audio('wrong', 'assets/audio/sfx_wrong.ogg');
         // voice hướng dẫn kéo cho bóng / hoa
         this.load.audio('drag_balloon', 'assets/audio/keo_bong.ogg');
         this.load.audio('drag_flower', 'assets/audio/keo_hoa.ogg');
@@ -51,6 +49,29 @@ export default class PreloadScene extends Phaser.Scene {
         this.load.audio('voice_end', 'assets/audio/voice_end.ogg');
 
         this.load.audio('voice_rotate', 'assets/audio/xoay.ogg');
+        //voice end
+        this.load.audio('complete', 'assets/audio/vic_sound.ogg');
+        this.load.audio('fireworks', 'assets/audio/fireworks.ogg');
+        this.load.audio('applause', 'assets/audio/applause.ogg');
+        this.load.audio('click', 'assets/audio/click.ogg');
+        this.load.audio('correct_1', 'assets/audio/correct_answer_1.ogg');
+        this.load.audio('correct_2', 'assets/audio/correct_answer_2.ogg');
+        this.load.audio('correct_3', 'assets/audio/correct_answer_3.ogg');
+        this.load.audio('correct_4', 'assets/audio/correct_answer_4.ogg');
+    
+        //bg_end
+        // --- BG END ---
+        this.load.image("banner_congrat", "assets/bg_end/banner_congrat.webp");
+        this.load.image("btn_exit", "assets/bg_end/btn_exit.webp");
+        this.load.image("btn_reset", "assets/bg_end/btn_reset.webp");
+        this.load.image("icon_end", "assets/bg_end/icon.webp");
+        this.load.image("ic_1", "assets/bg_end/ic_1.webp");
+        this.load.image("ic_2", "assets/bg_end/ic_2.webp");
+        this.load.image("ic_3", "assets/bg_end/ic_3.webp");
+        this.load.image("ic_4", "assets/bg_end/ic_4.webp");
+        this.load.image("ic_6", "assets/bg_end/ic_6.webp");
+        this.load.image("ic_7", "assets/bg_end/ic_7.webp");
+        this.load.image("ic_8", "assets/bg_end/ic_8.webp");
     }
 
     create() {
