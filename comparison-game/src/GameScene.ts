@@ -41,7 +41,10 @@ const BASE_BOARD_HEIGHT = 550;
 
 const BASE_CHARACTER_SCALE = 0.48; // scale nhân vật cơ bản
 const BASE_ANSWER_SCALE = 0.6;     // scale nút chọn
-const BASE_CHARACTER_GAP_Y = 25;   // khoảng cách dọc giữa nút và nhân vật
+const BASE_CHARACTER_GAP_Y = 10;   // khoảng cách dọc giữa nút và nhân vật (bên phải giữ nguyên)
+const BASE_CHARACTER_GAP_Y_LEFT = 10; // khoảng cách dọc riêng cho nhân vật bên trái (cô bé)
+const BASE_CHARACTER_GAP_Y_FLOWER_LEFT = 3; // khoảng cách dọc riêng cho lọ hoa bên trái
+const CHARACTER_GAP_Y_FLOWER_LEFT = BASE_CHARACTER_GAP_Y_FLOWER_LEFT * BOARD_SCALE;
 
 const BOARD_WIDTH = BASE_BOARD_WIDTH * BOARD_SCALE;
 const BOARD_HEIGHT = BASE_BOARD_HEIGHT * BOARD_SCALE;
@@ -49,6 +52,7 @@ const BOARD_HEIGHT = BASE_BOARD_HEIGHT * BOARD_SCALE;
 const CHARACTER_SCALE = BASE_CHARACTER_SCALE * BOARD_SCALE;
 const ANSWER_SCALE = BASE_ANSWER_SCALE * BOARD_SCALE;
 const CHARACTER_GAP_Y = BASE_CHARACTER_GAP_Y * BOARD_SCALE;
+const CHARACTER_GAP_Y_LEFT = BASE_CHARACTER_GAP_Y_LEFT * BOARD_SCALE;
 
 // ===== LAYOUT – các hằng số dễ chỉnh vị trí UI =====
 
@@ -236,11 +240,14 @@ export default class GameScene extends Phaser.Scene {
 
     this.promptText = this.add
       .text(width / 2, bannerY, '', {
-        fontFamily: 'San Francisco, "Noto Sans", system-ui, sans-serif',
+        fontFamily: 'Fredoka, San Francisco, "Noto Sans", system-ui, sans-serif',
         fontSize: `${PROMPT_FONT_SIZE * BOARD_SCALE}px`,
         fontStyle: '700',
         color: '#FFFFFF',
-        align: 'center'
+        align: 'center',
+        stroke: '#222',
+        strokeThickness: 4,
+        resolution: 2
       })
       .setOrigin(0.5);
 
@@ -254,6 +261,8 @@ export default class GameScene extends Phaser.Scene {
       BUTTON_OFFSET_Y;
 
     // Nút chọn
+
+    // Nút chọn (vùng tròn)
     this.leftBtn = this.add
       .image(baseLeftColX + BUTTON_OFFSET_X_LEFT, btnY, ANSWER_DEFAULT)
       .setScale(ANSWER_SCALE)
@@ -282,6 +291,7 @@ export default class GameScene extends Phaser.Scene {
         this.rightBtn.clearTint().setAlpha(1);
       });
 
+
     // NHÂN VẬT
     const currentSubject = this.levelSubjects[this.levelIndex] ?? 'BALLOON';
     const subjectOffset = CHARACTER_OFFSET_X[currentSubject];
@@ -291,12 +301,16 @@ export default class GameScene extends Phaser.Scene {
     this.girlSprite = this.add
       .image(girlX, 0, GIRL_TEXTURE[currentSubject])
       .setScale(CHARACTER_SCALE);
-    const girlY =
-      btnY -
-      this.leftBtn.displayHeight / 2 -
-      this.girlSprite.displayHeight / 2 -
-      CHARACTER_GAP_Y;
+    let girlY;
+    if (currentSubject === 'FLOWER') {
+      girlY = btnY - this.leftBtn.displayHeight / 2 - this.girlSprite.displayHeight / 2 - CHARACTER_GAP_Y_FLOWER_LEFT;
+    } else {
+      girlY = btnY - this.leftBtn.displayHeight / 2 - this.girlSprite.displayHeight / 2 - CHARACTER_GAP_Y_LEFT;
+    }
     this.girlSprite.setY(girlY);
+    // Gán sự kiện chọn sau khi tạo asset
+    this.girlSprite.setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.handleChoice('LEFT'));
 
     // Boy
     const boyX = baseRightColX + subjectOffset.right;
@@ -309,6 +323,9 @@ export default class GameScene extends Phaser.Scene {
       this.boySprite.displayHeight / 2 -
       CHARACTER_GAP_Y;
     this.boySprite.setY(boyY);
+    // Gán sự kiện chọn sau khi tạo asset
+    this.boySprite.setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.handleChoice('RIGHT'));
 
     // Feedback
     this.feedbackText = this.add
@@ -445,10 +462,31 @@ export default class GameScene extends Phaser.Scene {
       this.sound.play('sfx_correct');
       playRandomVoice(this.sound, this.correctVoices);
 
+
       const chosenBtn = side === 'LEFT' ? this.leftBtn : this.rightBtn;
       const otherBtn = side === 'LEFT' ? this.rightBtn : this.leftBtn;
       chosenBtn.setTexture(ANSWER_CORRECT);
       otherBtn.setTexture(ANSWER_WRONG);
+
+      // Làm mờ đáp án sai (nút và asset nhân vật)
+      otherBtn.setAlpha(0.45);
+      const otherChar = side === 'LEFT' ? this.boySprite : this.girlSprite;
+      otherChar.setAlpha(0.45);
+
+      // Hiệu ứng nổi bật đáp án đúng (nút và asset nhân vật, không bôi màu)
+      this.tweens.add({
+        targets: [chosenBtn, side === 'LEFT' ? this.girlSprite : this.boySprite],
+        scale: { from: ANSWER_SCALE, to: ANSWER_SCALE * 1.18 },
+        alpha: { from: 1, to: 1 },
+        duration: 220,
+        yoyo: true,
+        repeat: 2,
+        ease: 'Quad.Out',
+        onComplete: () => {
+          chosenBtn.setScale(ANSWER_SCALE);
+          (side === 'LEFT' ? this.girlSprite : this.boySprite).setScale(CHARACTER_SCALE);
+        }
+      });
 
       // đánh dấu level đã hoàn thành (cho main.ts dùng)
       this.gameState = 'LEVEL_END';
@@ -478,11 +516,26 @@ export default class GameScene extends Phaser.Scene {
       });
     } else {
       // dùng âm thanh thay cho text feedback
-      
       this.sound.play('sfx_wrong');
 
       const chosenBtn = side === 'LEFT' ? this.leftBtn : this.rightBtn;
       chosenBtn.setTexture(ANSWER_WRONG);
+
+      // Hiệu ứng shake đáp án sai
+      this.tweens.add({
+        targets: chosenBtn,
+        x: {
+          from: chosenBtn.x,
+          to: chosenBtn.x + 18
+        },
+        duration: 70,
+        yoyo: true,
+        repeat: 3,
+        ease: 'Quad.Out',
+        onComplete: () => {
+          chosenBtn.x = chosenBtn.x;
+        }
+      });
 
       this.time.delayedCall(700, () => {
         chosenBtn.setTexture(ANSWER_DEFAULT);

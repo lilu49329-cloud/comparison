@@ -107,11 +107,14 @@ export default class BalanceScene extends Phaser.Scene {
 
     const titleText = this.add
       .text(width / 2, bannerY, bannerText, {
-        fontFamily: 'San Francisco, "Noto Sans", system-ui, sans-serif',
+        fontFamily: 'Fredoka, San Francisco, "Noto Sans", system-ui, sans-serif',
         fontSize: '30px',
         fontStyle: '700',
         color: '#FFFFFF',
         align: 'center',
+        stroke: '#222',
+        strokeThickness: 4,
+        resolution: 2
       })
       .setOrigin(0.5);
 
