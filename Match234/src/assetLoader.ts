@@ -33,22 +33,26 @@ export function preloadGameAssets(scene: Phaser.Scene): void {
   scene.load.audio("voice_intro", "assets/audio/voice_intro.ogg");
   scene.load.audio("voice_complete", "assets/audio/complete.ogg");
   scene.load.audio("voice_need_finish", "assets/audio/voice_need_finish.ogg");
-  scene.load.audio("sfx_correct", "assets/audio/sfx_correct.ogg");
-  scene.load.audio("sfx_wrong", "assets/audio/sfx_wrong.ogg");
+  scene.load.audio("sfx_correct", "assets/audio/correct.ogg");
+  scene.load.audio("sfx_wrong", "assets/audio/wrong.ogg");
   scene.load.audio("bgm_main", "assets/audio/bgm_main.ogg");
   scene.load.audio("voice_end", "assets/audio/voice_end.ogg");
   scene.load.audio("voice_rotate", "assets/audio/xoay.ogg");
-  scene.load.audio("correct", "assets/audio/correct.ogg");
-  scene.load.audio("wrong", "assets/audio/error.ogg");
   scene.load.audio("complete", "assets/audio/vic_sound.ogg");
   scene.load.audio("fireworks", "assets/audio/fireworks.ogg");
   scene.load.audio("applause", "assets/audio/applause.ogg");
   scene.load.audio("sfx_click", "assets/audio/click.ogg");
+  scene.load.audio("correct_1", "assets/audio/correct_answer_1.ogg");
+  scene.load.audio("correct_2", "assets/audio/correct_answer_2.ogg");
+  scene.load.audio("correct_3", "assets/audio/correct_answer_3.ogg");
+  scene.load.audio("correct_4", "assets/audio/correct_answer_4.ogg");
 
   // --- BACKGROUND ---
   scene.load.image("bg1", "assets/bg/bg1.webp");
   scene.load.image("bg2", "assets/bg/bg2.webp");
   scene.load.image("bg3", "assets/bg/bg3.webp");
+  scene.load.image("bg4", "assets/bg/bg4.webp");
+  scene.load.image("bg5", "assets/bg/bg5.webp");
 
   // --- CHARACTERS ---
   scene.load.image("char", "assets/char/char.webp");
