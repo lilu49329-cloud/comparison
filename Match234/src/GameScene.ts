@@ -374,8 +374,8 @@ export default class GameScene extends Phaser.Scene {
     const charY = height - 10;
 
     const baseCharScale = height / 720;
-    scaleChar = baseCharScale * 0.55;
-    charX = width * 0.17;
+    scaleChar = baseCharScale * 0.35;
+    charX = width * 0.15;
 
         if (this.textures.exists(level.character)) {
           const charImg = this.add
