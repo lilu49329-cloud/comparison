@@ -2,6 +2,7 @@
 
 import Phaser from "phaser";
 import { preloadGameAssets, BUTTON_ASSET_URLS } from "./assetLoader";
+import { playRandomVoice } from "./audioUtils";
 
 // ========== TYPES ==========
 interface CardData {
@@ -113,7 +114,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 function buildOneTwoLevels(): LevelConfig[] {
   // Dùng cùng 4 asset cho nhiều màn, mỗi màn đổi pattern số và trộn thứ tự
-  const bgKeys = ["bg1", "bg2", "bg3"];
+  const bgKeys = ["bg1", "bg2", "bg3", "bg4", "bg5"];
   const charKeys = ["char", "char", "char"];
 
   const levels: LevelConfig[] = [];
@@ -122,15 +123,16 @@ function buildOneTwoLevels(): LevelConfig[] {
   const numLevels = 3;
 
   for (let i = 0; i < numLevels; i++) {
-    const shuffledAssets = shuffle(ALL_ASSETS_12);
-    const pattern =
-      ONE_TWO_PATTERNS[Math.floor(Math.random() * ONE_TWO_PATTERNS.length)];
+  const shuffledAssets = shuffle(ALL_ASSETS_12).slice(0, 4);
+  const pattern =
+    ONE_TWO_PATTERNS[Math.floor(Math.random() * ONE_TWO_PATTERNS.length)];
 
-    const items: LevelItem[] = shuffledAssets.map((key, idx) => ({
-      number: pattern[idx],
-      asset: key,
-      label: LABEL_BY_ASSET[key] || "",
-    }));
+  const items: LevelItem[] = shuffledAssets.map((key, idx) => ({
+    number: pattern[idx],
+    asset: key,
+    label: LABEL_BY_ASSET[key] || "",
+  }));
+  // ...
 
     levels.push({
       items,
@@ -144,6 +146,13 @@ function buildOneTwoLevels(): LevelConfig[] {
 
 // ========== MAIN CLASS ==========
 export default class GameScene extends Phaser.Scene {
+  private correctVoices: string[] = [
+  'correct_1',
+  'correct_2',
+  'correct_3',
+  'correct_4',
+];
+
   levels: LevelConfig[];
   level: number = 0;
 
@@ -366,8 +375,8 @@ export default class GameScene extends Phaser.Scene {
     const charY = height - 10;
 
     const baseCharScale = height / 720;
-    scaleChar = baseCharScale * 0.65;
-    charX = width * 0.11;
+    scaleChar = baseCharScale * 0.55;
+    charX = width * 0.17;
 
         if (this.textures.exists(level.character)) {
           const charImg = this.add
@@ -633,7 +642,7 @@ export default class GameScene extends Phaser.Scene {
         const gapX = -5;
 
         // Giới hạn chiều cao icon để không tràn thẻ
-        const maxIconHeight = cardH * (count === 1 ? 0.8 : 0.7);
+        const maxIconHeight = cardH * (count === 1 ? 1.05 : 1.0);
         let iconScale = maxIconHeight / aH;
 
         // Không cho phóng to hơn kích thước gốc
@@ -807,8 +816,10 @@ export default class GameScene extends Phaser.Scene {
 
         const objCard = objCardRaw;
         const objN = objCard.customData!.number;
+        const objAlreadyMatched = objCard.texture.key === "card_yellow2";
 
-        if (n !== objN && !this.matches[startIndex]) {
+        // Sai nếu số không khớp HOẶC thẻ vật đã được nối trước đó
+        if ((n !== objN || objAlreadyMatched) && !this.matches[startIndex]) {
           const playLocked = (window as any).playVoiceLocked as
             | ((s: Phaser.Sound.BaseSoundManager, k: string) => void)
             | undefined;
@@ -817,24 +828,16 @@ export default class GameScene extends Phaser.Scene {
           } else {
             this.sound.play("sfx_wrong");
           }
-
-          this.sound.play("wrong");
         }
 
-        if (n === objN && !this.matches[startIndex]) {
+        // Đúng chỉ khi số khớp và thẻ vật CHƯA được nối
+        if (n === objN && !objAlreadyMatched && !this.matches[startIndex]) {
           matched = true;
           this.matches[startIndex] = true;
 
-          const playLocked = (window as any).playVoiceLocked as
-            | ((s: Phaser.Sound.BaseSoundManager, k: string) => void)
-            | undefined;
-          if (playLocked) {
-            playLocked(this.sound, "sfx_correct");
-          } else {
-            this.sound.play("sfx_correct");
-          }
-
-          this.sound.play("correct");
+          this.sound.play("sfx_correct");
+          playRandomVoice(this.sound, this.correctVoices);
+          //this.sound.play('correct_1')
 
           startCard.clearTint();
           objCard.clearTint();
