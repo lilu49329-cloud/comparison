@@ -2,6 +2,7 @@
 
 import Phaser from "phaser";
 import { preloadGameAssets, BUTTON_ASSET_URLS } from "./assetLoader";
+import { playRandomVoice } from "./audioUtils";
 
 // ========== TYPES ==========
 interface CardData {
@@ -144,6 +145,13 @@ function buildOneTwoLevels(): LevelConfig[] {
 
 // ========== MAIN CLASS ==========
 export default class GameScene extends Phaser.Scene {
+  private correctVoices: string[] = [
+  'correct_1',
+  'correct_2',
+  'correct_3',
+  'correct_4',
+];
+
   levels: LevelConfig[];
   level: number = 0;
 
@@ -633,7 +641,7 @@ export default class GameScene extends Phaser.Scene {
         const gapX = -5;
 
         // Giới hạn chiều cao icon để không tràn thẻ
-        const maxIconHeight = cardH * (count === 1 ? 0.8 : 0.7);
+        const maxIconHeight = cardH * (count === 1 ? 1.05 : 1.0);
         let iconScale = maxIconHeight / aH;
 
         // Không cho phóng to hơn kích thước gốc
@@ -819,8 +827,6 @@ export default class GameScene extends Phaser.Scene {
           } else {
             this.sound.play("sfx_wrong");
           }
-
-          this.sound.play("wrong");
         }
 
         // Đúng chỉ khi số khớp và thẻ vật CHƯA được nối
@@ -828,16 +834,9 @@ export default class GameScene extends Phaser.Scene {
           matched = true;
           this.matches[startIndex] = true;
 
-          const playLocked = (window as any).playVoiceLocked as
-            | ((s: Phaser.Sound.BaseSoundManager, k: string) => void)
-            | undefined;
-          if (playLocked) {
-            playLocked(this.sound, "sfx_correct");
-          } else {
-            this.sound.play("sfx_correct");
-          }
-
-          this.sound.play("correct");
+          this.sound.play("sfx_correct");
+          playRandomVoice(this.sound, this.correctVoices);
+          //this.sound.play('correct_1')
 
           startCard.clearTint();
           objCard.clearTint();
