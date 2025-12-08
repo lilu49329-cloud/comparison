@@ -1,0 +1,121 @@
+<h1 align="center">Bé chọn số nào? (Game 1 & 2)</h1>
+
+**Minigame giáo dục cho trẻ mẫu giáo (4–5 tuổi): luyện đếm số lượng, nhận biết chữ số, nối số với nhóm đồ vật, phát triển tư duy logic & phối hợp tay–mắt thông qua thao tác kéo/nối!**
+
+---
+
+## 🎯 Giới thiệu
+
+Dự án này là bản TypeScript/Phaser 3 của game “Bé chọn số nào?”.
+Game được chia thành 3 scene chính:
+
+- `OverlayScene` – màn intro + nút “Bắt đầu”
+- `GameScene` – màn chơi chính (Game 1 & 2)
+- `EndGameScene` – màn kết thúc, cho phép chơi lại hoặc quay lại intro
+
+Bé kéo/nối các thẻ số sang thẻ hình có số lượng đồ vật tương ứng. Khi nối đúng, đường dây được cố định; nối sai có hiệu ứng âm thanh phản hồi.
+
+---
+
+## 🚩 Tính năng nổi bật
+
+- Nhiều level kết hợp từ các asset hình (ball, bear, drum, marble,…).
+- Phản hồi tức thì:
+  - Đúng: đổi thẻ vàng, phát âm thanh `sfx_correct`.
+  - Sai: phát âm thanh `sfx_wrong`.
+- Âm thanh giọng nói:
+  - `voice_intro` ở màn intro.
+  - `voice_need_finish` nếu chưa nối xong nhưng bấm Next.
+  - `voice_complete` khi hoàn thành một level.
+  - `voice_end` ở màn kết thúc.
+- Giao diện hoạt hình, màu sáng, font Fredoka.
+- BG intro & BG game được scale và crop để tràn full màn mà vẫn giữ phần quan trọng (chữ & nhân vật).
+- Responsive theo tỉ lệ 16:9, dùng `Phaser.Scale.FIT` + `autoCenter`.
+
+---
+
+## 🕹️ Cách chơi
+
+1. Vào màn intro, bấm nút **“BẮT ĐẦU”**.
+2. Ở màn game:
+   - Kéo/nhấn vào thẻ số bên trái để bắt đầu nối.
+   - Kéo đường dây sang thẻ hình bên phải có số lượng đồ vật tương ứng.
+3. Nối đúng: thẻ đổi màu vàng, đường dây được cố định.
+4. Khi hoàn thành toàn bộ cặp số–hình của level:
+   - Phát `voice_complete`.
+   - Có thể bấm Next để sang level tiếp theo.
+5. Sau level cuối cùng, game chuyển sang `EndGameScene`, hiển thị BG end và 2 nút:
+   - **Chơi lại**: quay lại GameScene level 0.
+   - **Thoát**: quay về intro (`OverlayScene`).
+
+---
+
+## 🚀 Cài đặt & chạy thử
+
+Repo hiện tại dùng **TypeScript + Phaser 3** (chạy qua bundler như Vite).
+
+### Cài đặt
+
+```bash
+npm install
+```
+
+### Chạy dev server
+
+```bash
+npm run dev
+```
+
+Mở URL hiển thị trên terminal (mặc định http://localhost:5173).
+
+### Build production (nếu cần)
+
+```bash
+npm run build
+npm run preview
+```
+
+## 📁 Cấu trúc thư mục
+
+```text
+Game-1-2/
+├── index.html             # Entry HTML
+├── src/                   # Mã nguồn TypeScript
+│   ├── main.ts            # Khởi tạo Phaser.Game + config
+│   ├── OverlayScene.ts    # Intro scene (BG intro + nút start)
+│   ├── GameScene.ts       # Scene chính: logic kéo nối số–hình
+│   ├── EndGameScene.ts    # Scene kết thúc
+│   └── assetLoader.ts     # Hàm preloadIntroAssets & preloadGameAssets
+├── public/                # Static assets (Vite sẽ serve dưới /assets)
+│   └── assets/
+│       ├── audio/         # voice_intro, voice_complete, bgm_main, ...
+│       ├── bg/            # bg1–bg7 (BG màn game)
+│       ├── bg_end/        # bg_end1, bg_end2 (màn EndGame)
+│       ├── intro/         # intro_bg_1–intro_bg_7 (màn intro)
+│       ├── card/          # card, card2, card_yellow, board, line_glow, ...
+│       ├── char/          # char1, char2 (nhân vật)
+│       ├── icon/          # babie, bear, ball, marble, drum, rabbit, ...
+│       └── button/        # btn_start, replay_endgame, exit_endgame, replay_svg, next_svg
+└── package.json           # Script npm, config bundler
+```
+
+## 🎨 Tuỳ biến asset & giao diện
+
+- **Đổi BG intro/game:**
+   - Thay file trong `public/assets/intro` hoặc `public/assets/bg` với cùng tên
+   - Nếu muốn thay đổi tỉ lệ BG, chỉnh lại logic scale/bias trong `OverlayScene.ts` và `GameScene.ts`
+- **Đổi icon / đồ vật:**
+   - Thay file tương ứng trong `public/assets/icon/`
+   - Cập nhật label/text (nếu cần) trong `GameScene.ts` (map `LABEL_BY_ASSET`)
+- **Font:**
+   - Mặc định dùng Google Fonts Fredoka
+   - Trong `main.ts` có hàm `waitForFredoka()` giúp chờ font load trước khi tạo game để text không “nhảy font” lần đầu
+- **Âm thanh:**
+   - Đổi file trong `public/assets/audio/` (giữ nguyên tên file), hoặc chỉnh lại file path trong `assetLoader.ts`
+
+## ⚙️ Công nghệ sử dụng
+
+- TypeScript + ES Modules
+- Phaser 3 (v3.90+)
+- Vite (hoặc bundler tương đương) cho dev server & build
+- Google Fonts – Fredoka
