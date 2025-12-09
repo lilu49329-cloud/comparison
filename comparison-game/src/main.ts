@@ -27,31 +27,31 @@ document.body.style.height = "100%";
 
 // ========== RANDOM BACKGROUND VIEWPORT ==========
 const INTRO_VIEWPORT_BGS = [
-  "assets/bg/bg1.webp",
-  "assets/bg/bg2.webp",
-  "assets/bg/bg3.webp",
-  "assets/bg/bg4.webp",
-  "assets/bg/bg5.webp",
-  "assets/bg/bg6.webp",
-  "assets/bg/bg7.webp",
+  "assets/bg/bg1.jpg",
+  "assets/bg/bg2.jpg",
+  "assets/bg/bg3.jpg",
+  "assets/bg/bg4.jpg",
+  "assets/bg/bg5.jpg",
+  "assets/bg/bg6.jpg",
+  "assets/bg/bg7.jpg",
 ];
 const GAME_VIEWPORT_BGS = [
-  "assets/bg/bg1.webp",
-  "assets/bg/bg2.webp",
-  "assets/bg/bg3.webp",
-  "assets/bg/bg4.webp",
-  "assets/bg/bg5.webp",
-  "assets/bg/bg6.webp",
-  "assets/bg/bg7.webp",
+  "assets/bg/bg1.jpg",
+  "assets/bg/bg2.jpg",
+  "assets/bg/bg3.jpg",
+  "assets/bg/bg4.jpg",
+  "assets/bg/bg5.jpg",
+  "assets/bg/bg6.jpg",
+  "assets/bg/bg7.jpg",
 ];
 const END_VIEWPORT_BGS = [
-  "assets/bg/bg1.webp",
-  "assets/bg/bg2.webp",
-  "assets/bg/bg3.webp",
-  "assets/bg/bg4.webp",
-  "assets/bg/bg5.webp",
-  "assets/bg/bg6.webp",
-  "assets/bg/bg7.webp",
+  "assets/bg/bg1.jpg",
+  "assets/bg/bg2.jpg",
+  "assets/bg/bg3.jpg",
+  "assets/bg/bg4.jpg",
+  "assets/bg/bg5.jpg",
+  "assets/bg/bg6.jpg",
+  "assets/bg/bg7.jpg",
 ];
 function setViewportBg(url: string, position: string = "center center") {
   document.body.style.backgroundImage = `url("${url}")`;
