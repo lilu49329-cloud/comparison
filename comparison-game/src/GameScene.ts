@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { LevelConfig, CompareMode } from './types';
-import { playRandomVoice } from './audioUtils'; 
+// import { playRandomVoice } from './audioUtils';
+import AudioManager from './AudioManager';
 
 
 type GameState =
@@ -128,12 +129,12 @@ export default class GameScene extends Phaser.Scene {
   private levelSubjects: Subject[] = [];
   private levelQuestions: string[] = [];
 
-  private correctVoices: string[] = [
-  'correct_1',
-  'correct_2',
-  'correct_3',
-  'correct_4',
-];
+//   private correctVoices: string[] = [
+//   'correct_1',
+//   'correct_2',
+//   'correct_3',
+//   'correct_4',
+// ];
 
   // đánh dấu việc vào / hoàn thành màn phụ (BalanceScene) cho level hiện tại
   public subgameEntered = false;
@@ -180,14 +181,11 @@ export default class GameScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
-    // Đảm bảo asset voice_rotate luôn có trong sound manager
-    if (!this.sound.get("voice_rotate")) {
-      try {
-        this.sound.add("voice_rotate");
-        console.log("[GameScene] Đã add voice_rotate vào sound manager");
-      } catch (e) {
-        console.warn("[GameScene] Không add được voice_rotate:", e);
-      }
+    // Đảm bảo âm thanh đã load (Howler)
+    if (!(AudioManager as any).isLoaded) {
+      AudioManager.loadAll().then(() => {
+        console.log('[GameScene] Âm thanh đã được load bởi AudioManager');
+      });
     }
 
     // Ẩn nút HTML ở màn câu hỏi, chỉ hiện khi sang màn phụ (BalanceScene)
@@ -335,7 +333,16 @@ export default class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.startLevel();
+    // Đảm bảo chỉ gọi startLevel sau khi AudioManager đã load xong
+    const start = () => this.startLevel();
+    if (!(AudioManager as any).isLoaded) {
+      AudioManager.loadAll().then(() => {
+        console.log('[GameScene] Âm thanh đã được load bởi AudioManager');
+        start();
+      });
+    } else {
+      start();
+    }
   }
 
   // ================= RANDOM LEVEL =================
@@ -424,7 +431,7 @@ export default class GameScene extends Phaser.Scene {
     const voiceKey =
       level.mode === 'LESS' ? voiceMap.LESS : voiceMap.MORE;
     try {
-      this.sound.play(voiceKey);
+      AudioManager.play(voiceKey);
     } catch (e) {
       console.warn('[CompareGame] Không phát được voice câu hỏi:', voiceKey, e);
     }
@@ -459,9 +466,8 @@ export default class GameScene extends Phaser.Scene {
 
       this.score++;
       // dùng âm thanh thay cho text feedback
-      this.sound.play('sfx_correct');
-      playRandomVoice(this.sound, this.correctVoices);
-
+      AudioManager.play('sfx-correct');
+      AudioManager.playCorrectAnswer();
 
       const chosenBtn = side === 'LEFT' ? this.leftBtn : this.rightBtn;
       const otherBtn = side === 'LEFT' ? this.rightBtn : this.leftBtn;
@@ -516,7 +522,7 @@ export default class GameScene extends Phaser.Scene {
       });
     } else {
       // dùng âm thanh thay cho text feedback
-      this.sound.play('sfx_wrong');
+      AudioManager.play('sfx-wrong');
 
       const chosenBtn = side === 'LEFT' ? this.leftBtn : this.rightBtn;
       chosenBtn.setTexture(ANSWER_WRONG);

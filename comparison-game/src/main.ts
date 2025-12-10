@@ -147,8 +147,8 @@ function patchGlobalSoundPlay() {
   ) {
     const k = typeof key === "string" ? key : (key as any)?.key;
 
-    // Khi overlay xoay dọc đang bật: block tất cả sound mới trừ voice_rotate
-    if (isRotateOverlayActive && typeof k === "string" && k !== "voice_rotate") {
+    // Khi overlay xoay dọc đang bật: block tất cả sound mới trừ voice-rotate
+    if (isRotateOverlayActive && typeof k === "string" && k !== "voice-rotate") {
       // Nếu là BGM loop thì nhớ để phát lại sau
       const willLoop =
         (config && config.loop) ||
@@ -179,7 +179,7 @@ function getVoicePriority(key: string): number {
   // Trung bình: đúng / sai
   if (key === "correct" || key === "wrong") return 2;
   // Trung bình / cao: các voice hướng dẫn
-  if (key === "voice_need_finish" || key === "voice_rotate") return 3;
+  if (key === "voice_need_finish" || key === "voice-rotate") return 3;
   // Cao nhất: complete
   if (key === "voice_complete") return 4;
   // Mặc định
@@ -191,8 +191,8 @@ export function playVoiceLocked(
   key: string
 ): void {
   // Khi overlay xoay ngang đang hiện: chỉ cho phép phát voice_rotate
-  if (isRotateOverlayActive && key !== "voice_rotate") {
-    console.warn(`[CompareGame] Đang overlay xoay ngang, chỉ phát voice_rotate!`);
+  if (isRotateOverlayActive && key !== "voice-rotate") {
+    console.warn(`[CompareGame] Đang overlay xoay ngang, chỉ phát voice-rotate!`);
     return;
   }
 
@@ -211,25 +211,26 @@ export function playVoiceLocked(
     currentVoiceKey = null;
   }
 
-  let instance = sound.get(key) as Phaser.Sound.BaseSound | null;
+  let trueKey = key === "voice-rotate" ? "voice-rotate" : key;
+  let instance = sound.get(trueKey) as Phaser.Sound.BaseSound | null;
   if (!instance) {
     try {
       // Nếu asset chưa có trong cache, add vào trước khi phát
-      instance = sound.add(key);
+      instance = sound.add(trueKey);
       if (!instance) {
         console.warn(
-          `[CompareGame] Không phát được audio key="${key}": Asset chưa được preload hoặc chưa có trong cache.`
+          `[CompareGame] Không phát được audio key="${trueKey}": Asset chưa được preload hoặc chưa có trong cache.`
         );
         return;
       }
     } catch (e) {
-      console.warn(`[CompareGame] Không phát được audio key="${key}":`, e);
+      console.warn(`[CompareGame] Không phát được audio key="${trueKey}":`, e);
       return;
     }
   }
 
   currentVoice = instance;
-  currentVoiceKey = key;
+  currentVoiceKey = trueKey;
   instance.once("complete", () => {
     if (currentVoice === instance) {
       currentVoice = null;
@@ -342,7 +343,7 @@ function updateRotateHint() {
       if (
         snd &&
         typeof snd.key === "string" &&
-        snd.key !== "voice_rotate" &&
+        snd.key !== "voice-rotate" &&
         snd.isPlaying &&
         typeof snd.stop === "function"
       ) {
@@ -361,13 +362,15 @@ function updateRotateHint() {
 
   // Khi overlay bật lên lần đầu -> phát voice_rotate
   if (overlayTurnedOn) {
-    const tryPlayVoiceRotate = () => {
+    const tryPlayVoiceRotate = (retry = 0) => {
       const isActive = audioScene.scene.isActive();
-      const hasVoiceRotate = audioScene.sound.get("voice_rotate");
+      const hasVoiceRotate = audioScene.sound.get("voice-rotate");
       if (isActive && hasVoiceRotate) {
-        playVoiceLocked(audioScene.sound, "voice_rotate");
+        playVoiceLocked(audioScene.sound, "voice-rotate");
+      } else if (retry < 20) { // thử lại tối đa 20 lần (6s)
+        setTimeout(() => tryPlayVoiceRotate(retry + 1), 300);
       } else {
-        setTimeout(tryPlayVoiceRotate, 300);
+        console.warn("[CompareGame] Không thể phát voice-rotate sau khi overlay bật (asset chưa load?)");
       }
     };
     tryPlayVoiceRotate();
@@ -395,7 +398,7 @@ function updateRotateHint() {
     resumeSoundContext(audioScene);
 
     const rotateSound = audioScene.sound.get(
-      "voice_rotate"
+      "voice-rotate"
     ) as Phaser.Sound.BaseSound | null;
     if (rotateSound && rotateSound.isPlaying) {
       rotateSound.stop();
@@ -443,9 +446,9 @@ function setupRotateHint() {
 
       resumeSoundContext(audioScene);
       try {
-        playVoiceLocked(audioScene.sound, "voice_rotate");
+        playVoiceLocked(audioScene.sound, "voice-rotate");
       } catch (e) {
-        console.warn("[CompareGame] Không phát được voice_rotate sau pointerdown:", e);
+        console.warn("[CompareGame] Không phát được voice-rotate sau pointerdown:", e);
       }
     });
   }
