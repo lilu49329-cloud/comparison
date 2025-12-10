@@ -51,6 +51,7 @@ const HOLE_OFFSET_X_RATIO = 0.2;
 // Dịch dọc: 0.5 = giữa; <0.5 lên trên; >0.5 xuống dưới
 const HOLE_OFFSET_Y_LEFT_RATIO = 0.494;
 const HOLE_OFFSET_Y_RIGHT_RATIO = 0.494;
+const LINE_INNER_FACTOR = 0.55;
 
 // Bán kính lỗ = tỉ lệ theo chiều cao card gốc (225px, lỗ 32px)
 const HOLE_RADIUS_RATIO = (32 / 2) / 225;
@@ -60,14 +61,13 @@ const LINE_THICKNESS_FACTOR = 0.55;
 //const LINE_TRIM_FACTOR = 0.12;
 
 // Độ lệch lỗ theo đường chéo (chưa dùng, để 0)
-const HOLE_SLOPE_OFFSET_RATIO = 0.0;
+const HOLE_SLOPE_OFFSET_RATIO = 0.026;
 
 // Offset tinh chỉnh theo index từng thẻ
 const HOLE_OFFSET_NUMBER_DX = [0.139, 0.133, 0.138, 0.138];
-const HOLE_OFFSET_NUMBER_DY = [-0.038, -0.027, -0.030, -0.017];
-
+const HOLE_OFFSET_NUMBER_DY = [-0.06, -0.048, -0.04, -0.017];
 const HOLE_OFFSET_OBJECT_DX = [-0.138, -0.133, -0.133, -0.138];
-const HOLE_OFFSET_OBJECT_DY = [-0.034, -0.034, -0.014, -0.019];
+const HOLE_OFFSET_OBJECT_DY = [-0.06, -0.064, -0.048, -0.019];
 
 // Tay hướng dẫn
 const HAND_ASSET_KEY = "hand";
@@ -174,6 +174,11 @@ export default class GameScene extends Phaser.Scene {
 
   bgm?: Phaser.Sound.BaseSound;
 
+   // 👉 Banner câu hỏi
+  private questionBanner?: Phaser.GameObjects.Image;
+  private promptText?: Phaser.GameObjects.Image;
+
+
   constructor() {
     super({ key: "GameScene" });
     this.levels = buildOneTwoLevels();
@@ -235,13 +240,13 @@ export default class GameScene extends Phaser.Scene {
 
   // Tính đoạn line giữa 2 lỗ
   computeSegment(
-    start: HolePos,
-    end: HolePos,
-    rStart: number,
-    rEnd: number,
-    thicknessFactor = LINE_THICKNESS_FACTOR,
-    innerFactor = 0.8
-  ): LineSegment {
+  start: HolePos,
+  end: HolePos,
+  rStart: number,
+  rEnd: number,
+  thicknessFactor = LINE_THICKNESS_FACTOR,
+  innerFactor = LINE_INNER_FACTOR
+): LineSegment {
     const dx = end.x - start.x;
     const dy = end.y - start.y;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -281,12 +286,19 @@ export default class GameScene extends Phaser.Scene {
       const endCard = this.objects[objIdx];
 
       const dyC = endCard.y - startCard.y;
-      let sStart = 0,
-        sEnd = 0;
-      if (dyC !== 0) {
+      let sStart = 0;
+      let sEnd = 0;
+
+      if (dyC > 0) {
+        // endCard nằm THẤP hơn startCard (line đi xuống)
         sStart = -1;
         sEnd = 1;
+      } else if (dyC < 0) {
+        // endCard nằm CAO hơn startCard (line đi lên)
+        sStart = 1;
+        sEnd = -1;
       }
+
 
       const start = this.getHolePos(startCard, "right", sStart);
       const end = this.getHolePos(endCard, "left", sEnd);
@@ -314,6 +326,8 @@ export default class GameScene extends Phaser.Scene {
     (window as any).setGameButtonsVisible?.(true);
 
     this.input.setDefaultCursor("default");
+
+    
 
     // ===== BGM =====
     let bgm = this.sound.get("bgm_main") as Phaser.Sound.BaseSound | null;
@@ -376,7 +390,7 @@ export default class GameScene extends Phaser.Scene {
 
     const baseCharScale = height / 720;
     scaleChar = baseCharScale * 0.55;
-    charX = width * 0.17;
+    charX = width * 0.15;
 
         if (this.textures.exists(level.character)) {
           const charImg = this.add
@@ -449,7 +463,7 @@ export default class GameScene extends Phaser.Scene {
     boardAreaW = spanW * 0.9;
     boardAreaH = height * 0.7;
     boardX = width * 0.56;
-    boardY = height * 0.48;
+    boardY = height * 0.57; // dịch bảng xuống một chút
 
     let scaleBoard = Math.min(
       boardAreaW / boardOrigW,
@@ -458,6 +472,30 @@ export default class GameScene extends Phaser.Scene {
     );
     const boardW = boardOrigW * scaleBoard;
     const boardH = boardOrigH * scaleBoard;
+
+    // ===== BANNER CÂU HỎI (ASSET IMAGE) =====
+    const bannerY = height * 0.12; // vị trí gần đầu màn hình
+    const bannerScale = 0.6; // tăng scale banner
+
+    if (this.textures.exists("banner")) {
+      const banner = this.add
+        .image(width / 2, bannerY, "banner")
+        .setOrigin(0.5)
+        .setScale(bannerScale);
+
+      this.questionBanner = banner;
+    }
+
+    if (this.textures.exists("text")) {
+      const textImg = this.add
+        .image(width / 2, bannerY, "text")
+        .setOrigin(0.5)
+        .setScale(bannerScale * 0.9); // hơi nhỏ hơn banner một chút
+
+      this.promptText = textImg;
+    }
+
+
 
     if (this.textures.exists("board")) {
       const boardImg = this.add
@@ -642,9 +680,23 @@ export default class GameScene extends Phaser.Scene {
         const gapX = -5;
 
         // Giới hạn chiều cao icon để không tràn thẻ
-        const maxIconHeight = cardH * (count === 1 ? 1.05 : 1.0);
+        // Kích thước scale trước là 1 icon sau là 2 icon 
+        const maxIconHeight = cardH * (count === 1 ? 0.9 : 0.9);
         let iconScale = maxIconHeight / aH;
 
+        // ===== BOOST RIÊNG ICON TRỐNG =====
+        if (item.asset === "spoon") {
+          iconScale *= 0.85;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+        }
+        if (item.asset === "bowl") {
+          iconScale *= 0.85;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+        }
+        if (item.asset === "lamp") {
+          iconScale *= 0.88;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+        }
+        if (item.asset === "clock") {
+          iconScale *= 0.8;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+        }
         // Không cho phóng to hơn kích thước gốc
         if (iconScale > 1) {
           iconScale = 1;
@@ -679,9 +731,12 @@ export default class GameScene extends Phaser.Scene {
 
         const startX = colNumX - groupWidth / 2 + (aW * iconScale) / 2;
 
+        // 👉 ĐẨY TOÀN BỘ ICON LÊN MỘT CHÚT
+        const iconYOffset = -cardH * 0.015; // 1% chiều cao thẻ, thích thì chỉnh 0.01 / 0.02
+
         for (let k = 0; k < count; k++) {
           const iconImg = this.add
-            .image(startX + k * stepX, y, item.asset)
+            .image(startX + k * stepX, y + iconYOffset, item.asset) // 🔴 đổi y -> y + iconYOffset
             .setOrigin(0.5, 0.5)
             .setScale(iconScale);
           console.log(
@@ -695,6 +750,7 @@ export default class GameScene extends Phaser.Scene {
             iconImg.scaleY
           );
         }
+
       }
 
       this.add
@@ -787,7 +843,10 @@ export default class GameScene extends Phaser.Scene {
 
       const startCard = this.numbers[this.dragStartIdx];
       const dyC = p.y - startCard.y;
-      const s = dyC !== 0 ? -1 : 0;
+
+      // Kéo lên  -> s = -1  (dịch lỗ lên)
+      // Kéo xuống -> s =  1  (dịch lỗ xuống)
+      const s = dyC < 0 ? -1 : 1;
 
       const start = this.getHolePos(startCard, "right", s);
       const rStart = this.getHoleRadius(startCard);
@@ -800,6 +859,7 @@ export default class GameScene extends Phaser.Scene {
       this.dragLine.setDisplaySize(seg.bodyLen, seg.thickness);
       this.dragLine.rotation = seg.angle;
     });
+
 
     this.input.on("pointerup", (p: Phaser.Input.Pointer) => {
       if (!this.isDragging || this.dragStartIdx === null) return;
@@ -858,12 +918,19 @@ export default class GameScene extends Phaser.Scene {
 
           if (this.dragLine) {
             const dyC2 = objCard.y - startCard.y;
-            let sStart = 0,
-              sEnd = 0;
-            if (dyC2 !== 0) {
+            let sStart = 0;
+            let sEnd = 0;
+
+            if (dyC2 > 0) {
+              // objCard nằm THẤP hơn startCard
               sStart = -1;
               sEnd = 1;
+            } else if (dyC2 < 0) {
+              // objCard nằm CAO hơn startCard
+              sStart = 1;
+              sEnd = -1;
             }
+
 
             const st = this.getHolePos(startCard, "right", sStart);
             const ed = this.getHolePos(objCard, "left", sEnd);
@@ -893,7 +960,7 @@ export default class GameScene extends Phaser.Scene {
       this.dragStartIdx = null;
 
       if (this.matches.every((m) => m)) {
-        this.time.delayedCall(2000, () => {
+        this.time.delayedCall(1500, () => {
           const playLocked = (window as any).playVoiceLocked as
             | ((s: Phaser.Sound.BaseSoundManager, k: string) => void)
             | undefined;
@@ -904,7 +971,7 @@ export default class GameScene extends Phaser.Scene {
           }
 
           // Tự động chuyển màn sau khi phát âm hoàn thành
-          this.time.delayedCall(800, () => {
+          this.time.delayedCall(100, () => {
             const nextIndex = this.level + 1;
             if (nextIndex >= this.levels.length) {
               this.scene.start("EndGameScene");
