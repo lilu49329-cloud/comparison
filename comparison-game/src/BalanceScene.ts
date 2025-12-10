@@ -32,7 +32,7 @@ const HAND_OFFSET: Record<Subject, { x: number; y: number }> = {
 };
 
 const UPGRADE_OFFSET: Record<Subject, { x: number; y: number }> = {
-  BALLOON: { x: 50, y: 0 },
+  BALLOON: { x: 0, y: 0 },
   FLOWER: { x: 0, y: 0 },
 };
 
@@ -136,7 +136,7 @@ export default class BalanceScene extends Phaser.Scene {
 
     // Panel nhân vật
     const actorPanelY = leftPanelY;
-    const actorPanelWidth = 600; // giảm để hai nhân vật gần nhau hơn
+    const actorPanelWidth = 700; // giảm để hai nhân vật gần nhau hơn
     const actorPanelHeight = 500;
 
     const panelSpacing = 50;
@@ -195,8 +195,8 @@ export default class BalanceScene extends Phaser.Scene {
       | HTMLImageElement
       | HTMLCanvasElement;
 
-    const maxCharHeight = actorPanelHeight * 0.9;
-    const maxCharWidth = actorPanelWidth * 0.4;
+    const maxCharHeight = actorPanelHeight * 0.75; // keep characters from overflowing
+    const maxCharWidth = actorPanelWidth * 0.33;
 
     // Tính scale cho từng ảnh rồi lấy scale chung nhỏ nhất
     const girlScaleRaw = Math.min(
