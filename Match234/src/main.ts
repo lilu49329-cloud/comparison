@@ -27,27 +27,27 @@ document.body.style.height = "100%";
 
 // ========== RANDOM BACKGROUND VIEWPORT ==========
 const INTRO_VIEWPORT_BGS = [
-  "assets/bg/bg1.webp",
-  "assets/bg/bg2.webp",
-  "assets/bg/bg3.webp",
-  "assets/bg/bg4.webp",
-  "assets/bg/bg5.webp",
+  "assets/bg/bg1.jpg",
+  "assets/bg/bg2.jpg",
+  "assets/bg/bg3.jpg",
+  "assets/bg/bg4.jpg",
+  "assets/bg/bg5.jpg",
 ];
 
 const GAME_VIEWPORT_BGS = [
-  "assets/bg/bg1.webp",
-  "assets/bg/bg2.webp",
-  "assets/bg/bg3.webp",
-  "assets/bg/bg4.webp",
-  "assets/bg/bg5.webp",
+  "assets/bg/bg1.jpg",
+  "assets/bg/bg2.jpg",
+  "assets/bg/bg3.jpg",
+  "assets/bg/bg4.jpg",
+  "assets/bg/bg5.jpg",
 ];
 
 const END_VIEWPORT_BGS = [
-  "assets/bg/bg1.webp",
-  "assets/bg/bg2.webp",
-  "assets/bg/bg3.webp",
-  "assets/bg/bg4.webp",
-  "assets/bg/bg5.webp",
+  "assets/bg/bg1.jpg",
+  "assets/bg/bg2.jpg",
+  "assets/bg/bg3.jpg",
+  "assets/bg/bg4.jpg",
+  "assets/bg/bg5.jpg",
 ];
 
 // Cho phép chỉnh vị trí BG (center / top...)
@@ -219,7 +219,16 @@ function resumeSoundContext(scene: Phaser.Scene) {
 
 function ensureRotateOverlay() {
   if (rotateOverlay) return;
-
+  // 👉 Thêm link font Baloo 2 riêng cho overlay
+  const fontLinkId = "baloo2-font-link";
+  if (!document.getElementById(fontLinkId)) {
+    const link = document.createElement("link");
+    link.id = fontLinkId;
+    link.rel = "stylesheet";
+    link.href =
+      "https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&display=swap";
+    document.head.appendChild(link);
+  }
   rotateOverlay = document.createElement("div");
   rotateOverlay.id = "rotate-overlay";
   rotateOverlay.style.position = "fixed";
@@ -234,17 +243,25 @@ function ensureRotateOverlay() {
   rotateOverlay.style.boxSizing = "border-box";
 
   const box = document.createElement("div");
-  box.style.background = "white";
-  box.style.borderRadius = "16px";
-  box.style.padding = "16px 20px";
-  box.style.maxWidth = "320px";
-  box.style.margin = "0 auto";
-  box.style.fontFamily =
-    '"Fredoka", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  box.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
+box.style.background = "white";
+box.style.borderRadius = "16px";
+box.style.padding = "16px 20px";
+box.style.maxWidth = "320px";
+box.style.margin = "0 auto";
+box.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
 
+// 👉 Dùng system sans (San Francisco, Segoe UI...)
+box.style.fontFamily =
+  '-apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif';
+// nếu sợ CSS global đè, ép luôn:
+box.style.setProperty(
+  "font-family",
+  '-apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Noto Sans", sans-serif',
+  "important"
+);
+  box.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
   const title = document.createElement("div");
-  title.textContent = "Bé Hãy Xoay Ngang Màn Hình Để Chơi Nhé 🌈";
+  title.textContent = "Bé Hãy Xoay Ngang Màn Hình Để  Chơi Nhé 🌈";
   title.style.fontSize = "18px";
   title.style.fontWeight = "700";
   title.style.marginBottom = "8px";
@@ -502,7 +519,7 @@ async function initGame() {
   }
 
   if (!game) {
-    //setRandomIntroViewportBg();
+    // setRandomIntroViewportBg();
     game = new Phaser.Game(config);
     setupHtmlButtons();
     setupPhaserResize(game);
