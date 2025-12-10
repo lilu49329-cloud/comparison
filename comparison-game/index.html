@@ -84,14 +84,9 @@
             const replayBtn = document.getElementById('btn-replay');
             const nextBtn = document.getElementById('btn-next');
 
-            console.log('[CompareGame] HTML loaded, buttons:', {
-              replayBtn,
-              nextBtn
-            });
 
             // Hàm để Phaser gọi (đã dùng trong GameScene/BalanceScene)
             (window).setGameButtonsVisible = function (visible) {
-              console.log('[CompareGame] setGameButtonsVisible:', visible);
               if (!replayBtn || !nextBtn) return;
               const display = visible ? 'block' : 'none';
               replayBtn.style.display = display;
@@ -100,7 +95,6 @@
 
             // Hàm set background viewport cho game-container, tránh zoom to
             (window).setRandomGameViewportBg = function () {
-              console.log('[CompareGame] setRandomGameViewportBg: apply bg to #game-container');
               const container = document.getElementById('game-container');
               if (!container) return;
               // Ví dụ chọn ngẫu nhiên 1 số background (nếu platform không override)
@@ -118,10 +112,6 @@
 
             // Log vị trí & kích thước sau khi layout xong
             window.addEventListener('load', () => {
-              if (replayBtn && nextBtn) {
-                console.log('[CompareGame] btn-replay rect:', replayBtn.getBoundingClientRect());
-                console.log('[CompareGame] btn-next rect:', nextBtn.getBoundingClientRect());
-              }
             });
           })();
         </script>

@@ -1,8 +1,6 @@
 import Phaser from 'phaser';
 import type { LevelConfig, CompareMode } from './types';
-// import { playRandomVoice } from './audioUtils';
 import AudioManager from './AudioManager';
-
 
 type GameState =
   | 'SHOW_LEVEL'
@@ -22,12 +20,12 @@ const QUESTION_FLOWER_LESS = 'BÊN NÀO CÓ ÍT HOA HƠN?';
 
 const GIRL_TEXTURE: Record<Subject, string> = {
   BALLOON: 'girl_balloon',
-  FLOWER: 'girl_flower'
+  FLOWER: 'girl_flower',
 };
 
 const BOY_TEXTURE: Record<Subject, string> = {
   BALLOON: 'boy_balloon',
-  FLOWER: 'boy_flower'
+  FLOWER: 'boy_flower',
 };
 
 const ANSWER_DEFAULT = 'answer_default';
@@ -40,11 +38,11 @@ const BOARD_SCALE = 1.0;
 const BASE_BOARD_WIDTH = 900;
 const BASE_BOARD_HEIGHT = 550;
 
-const BASE_CHARACTER_SCALE = 0.48; // scale nhân vật cơ bản
-const BASE_ANSWER_SCALE = 0.6;     // scale nút chọn
-const BASE_CHARACTER_GAP_Y = 10;   // khoảng cách dọc giữa nút và nhân vật (bên phải giữ nguyên)
-const BASE_CHARACTER_GAP_Y_LEFT = 10; // khoảng cách dọc riêng cho nhân vật bên trái (cô bé)
-const BASE_CHARACTER_GAP_Y_FLOWER_LEFT = 3; // khoảng cách dọc riêng cho lọ hoa bên trái
+const BASE_CHARACTER_SCALE = 0.48;
+const BASE_ANSWER_SCALE = 0.6;
+const BASE_CHARACTER_GAP_Y = 10;
+const BASE_CHARACTER_GAP_Y_LEFT = 10;
+const BASE_CHARACTER_GAP_Y_FLOWER_LEFT = 3;
 const CHARACTER_GAP_Y_FLOWER_LEFT = BASE_CHARACTER_GAP_Y_FLOWER_LEFT * BOARD_SCALE;
 
 const BOARD_WIDTH = BASE_BOARD_WIDTH * BOARD_SCALE;
@@ -57,56 +55,38 @@ const CHARACTER_GAP_Y_LEFT = BASE_CHARACTER_GAP_Y_LEFT * BOARD_SCALE;
 
 // ===== LAYOUT – các hằng số dễ chỉnh vị trí UI =====
 
-// Offset X nhân vật theo từng loại đồ vật
 const CHARACTER_OFFSET_X: Record<Subject, { left: number; right: number }> = {
   BALLOON: { left: 25.0, right: 60.0 },
-  FLOWER: { left: -30.0, right: -30.0 }
+  FLOWER: { left: -30.0, right: -30.0 },
 };
 
-// Tỉ lệ cột trái/phải trên board
 const LEFT_COL_RATIO = 0.3;
 const RIGHT_COL_RATIO = 0.7;
 
-// Vị trí board theo trục Y (pixel màn hình)
 const BOARD_TOP_Y = 140;
-
-// Vị trí banner câu hỏi theo trục Y
 const BANNER_Y = 80;
-
-// Scale banner câu hỏi (nhân với BOARD_SCALE)
 const BANNER_SCALE = 0.65;
 
-// Khoảng cách từ đáy board lên tới nút chọn (pixel gốc, nhân với BOARD_SCALE)
 const BUTTON_BOTTOM_MARGIN = 60;
-
-// Offset tinh chỉnh nút chọn theo trục X/Y (nếu cần lệch nhẹ)
 const BUTTON_OFFSET_Y = 0;
 const BUTTON_OFFSET_X_LEFT = 0;
 const BUTTON_OFFSET_X_RIGHT = 0;
 
-// Font size (gốc) cho câu hỏi & feedback (nhân với BOARD_SCALE)
 const PROMPT_FONT_SIZE = 30;
 const FEEDBACK_FONT_SIZE = 22;
-
-// Khoảng cách feedback text từ đáy màn hình (pixel)
 const FEEDBACK_BOTTOM_MARGIN = 40;
 
-// Map voice key đọc câu hỏi theo subject + mode
-const QUESTION_VOICE_KEY: Record<
-  Subject,
-  { MORE: string; LESS: string }
-> = {
+// Map voice key đọc câu hỏi theo subject + mode (khớp với AudioManager.ts)
+const QUESTION_VOICE_KEY: Record<Subject, { MORE: string; LESS: string }> = {
   BALLOON: {
-    MORE: 'q_balloon_more',
-    LESS: 'q_balloon_less',
+    MORE: 'more_b',
+    LESS: 'less_b',
   },
   FLOWER: {
-    MORE: 'q_flower_more',
-    LESS: 'q_flower_less',
+    MORE: 'more_f',
+    LESS: 'less_f',
   },
 };
-
-// ========================================================
 
 export default class GameScene extends Phaser.Scene {
   public levels: LevelConfig[] = [];
@@ -129,17 +109,9 @@ export default class GameScene extends Phaser.Scene {
   private levelSubjects: Subject[] = [];
   private levelQuestions: string[] = [];
 
-//   private correctVoices: string[] = [
-//   'correct_1',
-//   'correct_2',
-//   'correct_3',
-//   'correct_4',
-// ];
-
   // đánh dấu việc vào / hoàn thành màn phụ (BalanceScene) cho level hiện tại
   public subgameEntered = false;
-
-  public subgameDone = false; 
+  public subgameDone = false;
 
   constructor() {
     super('GameScene');
@@ -181,22 +153,13 @@ export default class GameScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
-    // Đảm bảo âm thanh đã load (Howler)
-    if (!(AudioManager as any).isLoaded) {
-      AudioManager.loadAll().then(() => {
-        console.log('[GameScene] Âm thanh đã được load bởi AudioManager');
-      });
-    }
-
-    // Ẩn nút HTML ở màn câu hỏi, chỉ hiện khi sang màn phụ (BalanceScene)
+    // Ẩn / hiện nút HTML cho viewport
     if ((window as any).setGameButtonsVisible) {
       (window as any).setGameButtonsVisible(true);
     }
     if ((window as any).setRandomGameViewportBg) {
       (window as any).setRandomGameViewportBg();
     }
-
-    // BOARD
 
     // Gắn asset cho nút HTML trên viewport
     const replayBtnEl = document.getElementById('btn-replay') as
@@ -217,6 +180,7 @@ export default class GameScene extends Phaser.Scene {
     setBtnBgFromUrl(replayBtnEl, 'assets/button/replay.png');
     setBtnBgFromUrl(nextBtnEl, 'assets/button/next.png');
 
+    // BOARD
     const boardX = (width - BOARD_WIDTH) / 2;
     const boardY = BOARD_TOP_Y;
 
@@ -224,7 +188,7 @@ export default class GameScene extends Phaser.Scene {
       .image(
         boardX + BOARD_WIDTH / 2,
         boardY + BOARD_HEIGHT / 2,
-        'banner_question'
+        'banner_question',
       )
       .setDisplaySize(BOARD_WIDTH, BOARD_HEIGHT)
       .setOrigin(0.5);
@@ -238,14 +202,15 @@ export default class GameScene extends Phaser.Scene {
 
     this.promptText = this.add
       .text(width / 2, bannerY, '', {
-        fontFamily: 'Fredoka, San Francisco, "Noto Sans", system-ui, sans-serif',
+        fontFamily:
+          'Fredoka, San Francisco, "Noto Sans", system-ui, sans-serif',
         fontSize: `${PROMPT_FONT_SIZE * BOARD_SCALE}px`,
         fontStyle: '700',
         color: '#FFFFFF',
         align: 'center',
         stroke: '#222',
         strokeThickness: 4,
-        resolution: 2
+        resolution: 2,
       })
       .setOrigin(0.5);
 
@@ -257,8 +222,6 @@ export default class GameScene extends Phaser.Scene {
       BOARD_HEIGHT -
       BUTTON_BOTTOM_MARGIN * BOARD_SCALE +
       BUTTON_OFFSET_Y;
-
-    // Nút chọn
 
     // Nút chọn (vùng tròn)
     this.leftBtn = this.add
@@ -289,7 +252,6 @@ export default class GameScene extends Phaser.Scene {
         this.rightBtn.clearTint().setAlpha(1);
       });
 
-
     // NHÂN VẬT
     const currentSubject = this.levelSubjects[this.levelIndex] ?? 'BALLOON';
     const subjectOffset = CHARACTER_OFFSET_X[currentSubject];
@@ -299,15 +261,23 @@ export default class GameScene extends Phaser.Scene {
     this.girlSprite = this.add
       .image(girlX, 0, GIRL_TEXTURE[currentSubject])
       .setScale(CHARACTER_SCALE);
-    let girlY;
+    let girlY: number;
     if (currentSubject === 'FLOWER') {
-      girlY = btnY - this.leftBtn.displayHeight / 2 - this.girlSprite.displayHeight / 2 - CHARACTER_GAP_Y_FLOWER_LEFT;
+      girlY =
+        btnY -
+        this.leftBtn.displayHeight / 2 -
+        this.girlSprite.displayHeight / 2 -
+        CHARACTER_GAP_Y_FLOWER_LEFT;
     } else {
-      girlY = btnY - this.leftBtn.displayHeight / 2 - this.girlSprite.displayHeight / 2 - CHARACTER_GAP_Y_LEFT;
+      girlY =
+        btnY -
+        this.leftBtn.displayHeight / 2 -
+        this.girlSprite.displayHeight / 2 -
+        CHARACTER_GAP_Y_LEFT;
     }
     this.girlSprite.setY(girlY);
-    // Gán sự kiện chọn sau khi tạo asset
-    this.girlSprite.setInteractive({ useHandCursor: true })
+    this.girlSprite
+      .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => this.handleChoice('LEFT'));
 
     // Boy
@@ -321,28 +291,24 @@ export default class GameScene extends Phaser.Scene {
       this.boySprite.displayHeight / 2 -
       CHARACTER_GAP_Y;
     this.boySprite.setY(boyY);
-    // Gán sự kiện chọn sau khi tạo asset
-    this.boySprite.setInteractive({ useHandCursor: true })
+    this.boySprite
+      .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => this.handleChoice('RIGHT'));
 
-    // Feedback
+    // Feedback text
     this.feedbackText = this.add
       .text(width / 2, height - FEEDBACK_BOTTOM_MARGIN, '', {
         fontSize: `${FEEDBACK_FONT_SIZE * BOARD_SCALE}px`,
-        color: '#333'
+        color: '#333',
       })
       .setOrigin(0.5);
 
-    // Đảm bảo chỉ gọi startLevel sau khi AudioManager đã load xong
-    const start = () => this.startLevel();
-    if (!(AudioManager as any).isLoaded) {
-      AudioManager.loadAll().then(() => {
-        console.log('[GameScene] Âm thanh đã được load bởi AudioManager');
-        start();
-      });
-    } else {
-      start();
-    }
+    // Đăng ký hàm phát lại câu hỏi để rotateOrientation có thể gọi
+    (window as any).playCurrentQuestionVoice = () => {
+      this.playCurrentQuestionVoice();
+    };
+
+    this.startLevel();
   }
 
   // ================= RANDOM LEVEL =================
@@ -357,7 +323,7 @@ export default class GameScene extends Phaser.Scene {
       { subject: 'BALLOON', mode: 'MORE' },
       { subject: 'BALLOON', mode: 'LESS' },
       { subject: 'FLOWER', mode: 'MORE' },
-      { subject: 'FLOWER', mode: 'LESS' }
+      { subject: 'FLOWER', mode: 'LESS' },
     ];
 
     // shuffle
@@ -391,7 +357,7 @@ export default class GameScene extends Phaser.Scene {
         id: i + 1,
         leftCount,
         rightCount,
-        mode
+        mode,
       });
 
       subjects.push(subject);
@@ -401,18 +367,39 @@ export default class GameScene extends Phaser.Scene {
     return { levels, subjects, questions };
   }
 
-  // =============== BẮT ĐẦU MÀN ===============
-  private startLevel() {
-    if (this.levelIndex >= this.levels.length) {
-      this.scene.start('EndGameScene', {
-        score: this.score,
-        total: this.levels.length
-      });
+  // Phát voice câu hỏi tương ứng màn hiện tại
+  private playCurrentQuestionVoice() {
+    if (
+      this.levelIndex >= this.levels.length ||
+      !this.levelSubjects[this.levelIndex]
+    ) {
       return;
     }
 
     const subject = this.levelSubjects[this.levelIndex];
     const level = this.levels[this.levelIndex];
+
+    const voiceMap = QUESTION_VOICE_KEY[subject];
+    const voiceKey =
+      level.mode === 'LESS' ? voiceMap.LESS : voiceMap.MORE;
+    try {
+      AudioManager.play(voiceKey);
+    } catch (e) {
+    }
+
+  }
+
+  // =============== BẮT ĐẦU MÀN ===============
+  private startLevel() {
+    if (this.levelIndex >= this.levels.length) {
+      this.scene.start('EndGameScene', {
+        score: this.score,
+        total: this.levels.length,
+      });
+      return;
+    }
+
+    const subject = this.levelSubjects[this.levelIndex];
 
     this.promptText.setText(this.levelQuestions[this.levelIndex]);
 
@@ -426,15 +413,8 @@ export default class GameScene extends Phaser.Scene {
     const scaleY = BANNER_SCALE * BOARD_SCALE;
     this.questionBanner.setScale(scaleX, scaleY);
 
-    // Phát voice đọc câu hỏi (luôn phát khi vào màn chính)
-    const voiceMap = QUESTION_VOICE_KEY[subject];
-    const voiceKey =
-      level.mode === 'LESS' ? voiceMap.LESS : voiceMap.MORE;
-    try {
-      AudioManager.play(voiceKey);
-    } catch (e) {
-      console.warn('[CompareGame] Không phát được voice câu hỏi:', voiceKey, e);
-    }
+    // Phát voice đọc câu hỏi (dùng AudioManager)
+    this.playCurrentQuestionVoice();
 
     this.girlSprite.setTexture(GIRL_TEXTURE[subject]);
     this.boySprite.setTexture(BOY_TEXTURE[subject]);
@@ -465,8 +445,9 @@ export default class GameScene extends Phaser.Scene {
       this.subgameEntered = true;
 
       this.score++;
-      // dùng âm thanh thay cho text feedback
-      AudioManager.play('sfx-correct');
+
+      // dùng âm thanh từ AudioManager
+      AudioManager.play('sfx_correct');
       AudioManager.playCorrectAnswer();
 
       const chosenBtn = side === 'LEFT' ? this.leftBtn : this.rightBtn;
@@ -479,7 +460,7 @@ export default class GameScene extends Phaser.Scene {
       const otherChar = side === 'LEFT' ? this.boySprite : this.girlSprite;
       otherChar.setAlpha(0.45);
 
-      // Hiệu ứng nổi bật đáp án đúng (nút và asset nhân vật, không bôi màu)
+      // Hiệu ứng nổi bật đáp án đúng
       this.tweens.add({
         targets: [chosenBtn, side === 'LEFT' ? this.girlSprite : this.boySprite],
         scale: { from: ANSWER_SCALE, to: ANSWER_SCALE * 1.18 },
@@ -490,24 +471,24 @@ export default class GameScene extends Phaser.Scene {
         ease: 'Quad.Out',
         onComplete: () => {
           chosenBtn.setScale(ANSWER_SCALE);
-          (side === 'LEFT' ? this.girlSprite : this.boySprite).setScale(CHARACTER_SCALE);
-        }
+          (side === 'LEFT' ? this.girlSprite : this.boySprite).setScale(
+            CHARACTER_SCALE,
+          );
+        },
       });
 
       // đánh dấu level đã hoàn thành (cho main.ts dùng)
       this.gameState = 'LEVEL_END';
 
-      // BẬT NÚT VIEWPORT HTML
+      // Bật nút HTML
       if ((window as any).setGameButtonsVisible) {
         (window as any).setGameButtonsVisible(true);
       }
 
       // nhân vật nào đang cầm ÍT đồ hơn trong màn chính?
-      // GameScene luôn: cô bé ở trái, cậu bé ở phải
       const lessIsLeft = level.leftCount < level.rightCount;
       const lessCharacter: 'GIRL' | 'BOY' = lessIsLeft ? 'GIRL' : 'BOY';
 
-      // ❗ CHỈ GỬI levelIndex HIỆN TẠI, KHÔNG +1
       // Tăng delay để âm thanh đúng được phát hết trước khi chuyển màn
       this.time.delayedCall(2000, () => {
         this.scene.start('BalanceScene', {
@@ -516,13 +497,13 @@ export default class GameScene extends Phaser.Scene {
           nextScene: 'GameScene',
           score: this.score,
           levelIndex: this.levelIndex,
-          subject: this.levelSubjects[this.levelIndex], // 👈 BẮT BUỘC
-          lessCharacter, // cho BalanceScene biết ai là người cần được thêm bóng/hoa
+          subject: this.levelSubjects[this.levelIndex],
+          lessCharacter,
         });
       });
     } else {
-      // dùng âm thanh thay cho text feedback
-      AudioManager.play('sfx-wrong');
+      // dùng âm thanh sai từ AudioManager
+      AudioManager.play('sfx_wrong');
 
       const chosenBtn = side === 'LEFT' ? this.leftBtn : this.rightBtn;
       chosenBtn.setTexture(ANSWER_WRONG);
@@ -532,7 +513,7 @@ export default class GameScene extends Phaser.Scene {
         targets: chosenBtn,
         x: {
           from: chosenBtn.x,
-          to: chosenBtn.x + 18
+          to: chosenBtn.x + 18,
         },
         duration: 70,
         yoyo: true,
@@ -540,7 +521,7 @@ export default class GameScene extends Phaser.Scene {
         ease: 'Quad.Out',
         onComplete: () => {
           chosenBtn.x = chosenBtn.x;
-        }
+        },
       });
 
       this.time.delayedCall(700, () => {

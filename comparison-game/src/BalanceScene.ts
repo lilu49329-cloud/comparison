@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import type GameScene from './GameScene';
-
-
+import { resetRotateVoiceLock } from './rotateOrientation';
 
 type Subject = 'BALLOON' | 'FLOWER';
 
@@ -87,6 +86,9 @@ export default class BalanceScene extends Phaser.Scene {
     const { width, height } = this.scale;
 
     this.scene.bringToTop();
+
+    // Reset trạng thái khóa voice của hệ thống xoay khi vào màn phụ mới
+    resetRotateVoiceLock();
 
     if ((window as any).setGameButtonsVisible) {
       (window as any).setGameButtonsVisible(true);
@@ -295,7 +297,7 @@ export default class BalanceScene extends Phaser.Scene {
       .setScale(this.objectScale)
       .setInteractive({ draggable: true });
 
-    const idleTween = this.tweens.add({
+    let idleTween = this.tweens.add({
       targets: draggable,
       y: startY - 15,
       angle: -3,
@@ -395,12 +397,25 @@ export default class BalanceScene extends Phaser.Scene {
         draggable.x = startX;
         draggable.y = startY;
         draggable.setAngle(0);
-        idleTween.restart();
+        if (idleTween && (idleTween as any).parent) {
+          idleTween.restart();
+        } else {
+          idleTween = this.tweens.add({
+            targets: draggable,
+            y: startY - 15,
+            angle: -3,
+            duration: 900,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.inOut',
+          });
+        }
       }
     });
 
+    // Voice hướng dẫn kéo bóng/hoa – dùng key audio trong AudioManager
     const dragKey =
-      this.subject === 'BALLOON' ? 'drag_balloon' : 'drag_flower';
+      this.subject === 'BALLOON' ? 'keo_bong' : 'keo_hoa';
     (window as any).playVoiceLocked(this.sound, dragKey);
   }
 }
