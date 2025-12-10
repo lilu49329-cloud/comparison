@@ -84,7 +84,7 @@ export default class BalanceScene extends Phaser.Scene {
   }
 
   create() {
-    const { width } = this.scale;
+    const { width, height } = this.scale;
 
     this.scene.bringToTop();
 
@@ -128,20 +128,31 @@ export default class BalanceScene extends Phaser.Scene {
     banner.setScale(scaleX, bannerBaseScaleY);
 
     // Panel trái
-    const leftPanelX = 80;
-    const leftPanelY = 160;
     const leftPanelWidth = 320;
     const leftPanelHeight = 500;
+    const panelVerticalOffset = 40; // push panels slightly below banner
+    const leftPanelY =
+      Math.max(120, height / 2 - leftPanelHeight / 2 + panelVerticalOffset);
 
-    const leftCenterOffsetX = 8;
-    const leftCenterOffsetY = -10;
+    // Panel nhân vật
+    const actorPanelY = leftPanelY;
+    const actorPanelWidth = 600; // giảm để hai nhân vật gần nhau hơn
+    const actorPanelHeight = 500;
+
+    const panelSpacing = 50;
+    const layoutWidth = leftPanelWidth + actorPanelWidth + panelSpacing;
+    const baseLayoutX = width / 2 - layoutWidth / 2;
+
+    const leftPanelX = baseLayoutX;
+    const leftCenterOffsetX = 0;
+    const leftCenterOffsetY = 0;
 
     const leftPanelCenterX =
       leftPanelX + leftPanelWidth / 2 + leftCenterOffsetX;
     this.panelLeftX = leftPanelCenterX;
 
     const leftPanel = this.add.graphics();
-    leftPanel.fillStyle(0xffffff, 1);
+    leftPanel.fillStyle(0xebffec, 1); // màu #ebffec
     leftPanel.fillRoundedRect(
       leftPanelX,
       leftPanelY,
@@ -150,14 +161,10 @@ export default class BalanceScene extends Phaser.Scene {
       30
     );
 
-    // Panel nhân vật
-    const actorPanelX = 450;
-    const actorPanelY = 160;
-    const actorPanelWidth = 760;
-    const actorPanelHeight = 500;
+    const actorPanelX = baseLayoutX + leftPanelWidth + panelSpacing;
 
     const actorPanel = this.add.graphics();
-    actorPanel.fillStyle(0xffffff, 1);
+    actorPanel.fillStyle(0xebffec, 1); // màu #ebffec
     actorPanel.fillRoundedRect(
       actorPanelX,
       actorPanelY,
@@ -171,7 +178,7 @@ export default class BalanceScene extends Phaser.Scene {
     this.leftActorCenterX = actorPanelX + actorPanelWidth * 0.25;
     this.rightActorCenterX = actorPanelX + actorPanelWidth * 0.75;
 
-    this.actorY = actorPanelCenterY + 20;
+    this.actorY = actorPanelCenterY ;
 
     // Random vị trí nhân vật nhận kéo: cô bé / cậu bé trái-phải
     this.girlSide = Math.random() < 0.5 ? 'LEFT' : 'RIGHT';
@@ -188,8 +195,8 @@ export default class BalanceScene extends Phaser.Scene {
       | HTMLImageElement
       | HTMLCanvasElement;
 
-    const maxCharHeight = actorPanelHeight * 0.8;
-    const maxCharWidth = actorPanelWidth * 0.3;
+    const maxCharHeight = actorPanelHeight * 0.9;
+    const maxCharWidth = actorPanelWidth * 0.4;
 
     // Tính scale cho từng ảnh rồi lấy scale chung nhỏ nhất
     const girlScaleRaw = Math.min(
