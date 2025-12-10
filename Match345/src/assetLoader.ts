@@ -9,95 +9,79 @@ export const BUTTON_ASSET_URLS = {
 // Chỉ load những asset cần cho màn intro
 export function preloadIntroAssets(scene: Phaser.Scene): void {
   // AUDIO: chỉ cần nhạc nền + voice_intro
-  scene.load.audio("voice_intro", "assets/audio/voice_intro.ogg");
-  scene.load.audio("bgm_main", "assets/audio/bgm_main.ogg");
+  scene.load.audio("voice_intro", "assets/audio/voice_intro.mp3");
+  scene.load.audio("bgm_main", "assets/audio/bgm_main.mp3");
 
-  // BG intro
-  scene.load.image("intro_bg_1", "assets/intro/bge1.webp");
-  scene.load.image("intro_bg_2", "assets/intro/bge2.webp");
-  scene.load.image("intro_bg_3", "assets/intro/bge3.webp");
-
-  // CHARACTER & TITLE intro – rất quan trọng
-  scene.load.image("intro_char_1", "assets/intro/char1.webp");
-  scene.load.image("intro_char_2", "assets/intro/char_intro2.webp");
-  scene.load.image("intro_title", "assets/intro/title.webp");
-
-  // Nút start
-  scene.load.image("btn_start", "assets/button/btn_start.webp");
 }
 
 
 // Load toàn bộ asset dùng trong game (GameScene + EndGameScene)
 export function preloadGameAssets(scene: Phaser.Scene): void {
   // --- AUDIO ---
-  scene.load.audio("voice_intro", "assets/audio/voice_intro.ogg");
-  scene.load.audio("voice_complete", "assets/audio/complete.ogg");
-  scene.load.audio("voice_need_finish", "assets/audio/voice_need_finish.ogg");
-  scene.load.audio("sfx_correct", "assets/audio/correct.ogg");
-  scene.load.audio("sfx_wrong", "assets/audio/wrong.ogg");
-  scene.load.audio("bgm_main", "assets/audio/bgm_main.ogg");
-  scene.load.audio("voice_end", "assets/audio/voice_end.ogg");
-  scene.load.audio("voice_rotate", "assets/audio/xoay.ogg");
-  scene.load.audio("complete", "assets/audio/vic_sound.ogg");
-  scene.load.audio("fireworks", "assets/audio/fireworks.ogg");
-  scene.load.audio("applause", "assets/audio/applause.ogg");
-  scene.load.audio("sfx_click", "assets/audio/click.ogg");
-  scene.load.audio("correct_1", "assets/audio/correct_answer_1.ogg");
-  scene.load.audio("correct_2", "assets/audio/correct_answer_2.ogg");
-  scene.load.audio("correct_3", "assets/audio/correct_answer_3.ogg");
-  scene.load.audio("correct_4", "assets/audio/correct_answer_4.ogg");
+  scene.load.audio("voice_intro", "assets/audio/voice_intro.mp3");
+  scene.load.audio("voice_complete", "assets/audio/complete.mp3");
+  scene.load.audio("voice_need_finish", "assets/audio/voice_need_finish.mp3");
+  scene.load.audio("sfx_correct", "assets/audio/correct.mp3");
+  scene.load.audio("sfx_wrong", "assets/audio/wrong.mp3");
+  scene.load.audio("bgm_main", "assets/audio/bgm_main.mp3");
+  scene.load.audio("voice_end", "assets/audio/voice_end.mp3");
+  scene.load.audio("voice_rotate", "assets/audio/xoay.mp3");
+  scene.load.audio("complete", "assets/audio/vic_sound.mp3");
+  scene.load.audio("fireworks", "assets/audio/fireworks.mp3");
+  scene.load.audio("applause", "assets/audio/applause.mp3");
+  scene.load.audio("sfx_click", "assets/audio/click.mp3");
+  scene.load.audio("correct_1", "assets/audio/correct_answer_1.mp3");
+  scene.load.audio("correct_2", "assets/audio/correct_answer_2.mp3");
+  scene.load.audio("correct_3", "assets/audio/correct_answer_3.mp3");
+  scene.load.audio("correct_4", "assets/audio/correct_answer_4.mp3");
 
   // --- BACKGROUND ---
-  scene.load.image("bg1", "assets/bg/bg1.webp");
-  scene.load.image("bg2", "assets/bg/bg2.webp");
-  scene.load.image("bg3", "assets/bg/bg3.webp");
-  scene.load.image("bg4", "assets/bg/bg4.webp");
-  scene.load.image("bg5", "assets/bg/bg5.webp");
-
+  scene.load.image("bg1", "assets/bg/bg1.jpg");
+  scene.load.image("bg2", "assets/bg/bg2.jpg");
+  scene.load.image("bg3", "assets/bg/bg3.jpg");
+  scene.load.image("bg4", "assets/bg/bg4.jpg");
+  scene.load.image("bg5", "assets/bg/bg5.jpg");
   // --- CHARACTERS ---
-  scene.load.image("char", "assets/char/char.webp");
-  // dùng lại cho OverlayScene nếu quay lại intro
-  scene.load.image("intro_char_1", "assets/intro/char1.webp");
-  scene.load.image("intro_title", "assets/intro/title.webp");
+  scene.load.image("char", "assets/char/char.png");
 
   // --- BUTTONS ---
-  scene.load.image("btn_start", "assets/button/btn_start.webp");
-  scene.load.image("replay_endgame", "assets/button/replay_endgame.webp");
+  scene.load.image("btn_start", "assets/button/btn_start.png");
+  scene.load.image("replay_endgame", "assets/button/replay_endgame.png");
   scene.load.image("replay_svg", BUTTON_ASSET_URLS.replay_svg);
   scene.load.image("next_svg", BUTTON_ASSET_URLS.next_svg);
-  scene.load.image("exit_endgame", "assets/button/exit.webp");
-
+  scene.load.image("exit_endgame", "assets/button/exit.png");
   // --- CARDS ---
-  scene.load.image("card", "assets/card/card.webp");
-  scene.load.image("card2", "assets/card/card2.webp");
-  scene.load.image("card_yellow", "assets/card/card_yellow.webp");
-  scene.load.image("card_yellow2", "assets/card/card_yellow2.webp");
-  scene.load.image("card_glow", "assets/card/card_glow.webp");
-  scene.load.image("line_glow", "assets/card/line_glow.webp");
-  scene.load.image("board", "assets/card/board.webp");
+  scene.load.image("card", "assets/card/card.png");
+  scene.load.image("card2", "assets/card/card2.png");
+  scene.load.image("card_yellow", "assets/card/card_yellow.png");
+  scene.load.image("card_yellow2", "assets/card/card_yellow2.png");
+  scene.load.image("card_glow", "assets/card/card_glow.png");
+  scene.load.image("line_glow", "assets/card/line_glow.png");
+  scene.load.image("board", "assets/card/board.png");
+  scene.load.image('text', 'assets/card/text.png');
+  scene.load.image('banner', 'assets/card/banner.png');
 
   // --- ICONS ---
-  scene.load.image("watermelon", "assets/icon/watermelon.webp");
-  scene.load.image("carrot", "assets/icon/carrot.webp");
-  scene.load.image("orange", "assets/icon/orange.webp");
-  scene.load.image("pumpkin", "assets/icon/pumpkin.webp");
-  scene.load.image("apple", "assets/icon/apple.webp");
-  scene.load.image("hand", "assets/icon/hand.webp");
+  scene.load.image("watermelon", "assets/icon/watermelon.png");
+  scene.load.image("carrot", "assets/icon/carrot.png");
+  scene.load.image("orange", "assets/icon/orange.png");
+  scene.load.image("pumpkin", "assets/icon/pumpkin.png");
+  scene.load.image("apple", "assets/icon/apple.png");
+  scene.load.image("hand", "assets/icon/hand.png");
 ;
 
   // --- BG END ---
-  scene.load.image("banner_congrat", "assets/bg_end/banner_congrat.webp");
-  scene.load.image("btn_exit", "assets/bg_end/btn_exit.webp");
-  scene.load.image("btn_reset", "assets/bg_end/btn_reset.webp");
-  scene.load.image("icon_end", "assets/bg_end/icon.webp");
-  scene.load.image("ic_1", "assets/bg_end/ic_1.webp");
-  scene.load.image("ic_2", "assets/bg_end/ic_2.webp");
-  scene.load.image("ic_3", "assets/bg_end/ic_3.webp");
-  scene.load.image("ic_4", "assets/bg_end/ic_4.webp");
-  scene.load.image("ic_6", "assets/bg_end/ic_6.webp");
-  scene.load.image("ic_7", "assets/bg_end/ic_7.webp");
-  scene.load.image("ic_8", "assets/bg_end/ic_8.webp");
-
+  scene.load.image("banner_congrat", "assets/bg_end/banner_congrat.png");
+  scene.load.image("btn_exit", "assets/bg_end/btn_exit.png");
+  scene.load.image("btn_reset", "assets/bg_end/btn_reset.png");
+  scene.load.image("icon_end", "assets/bg_end/icon.png");
+  scene.load.image("ic_1", "assets/bg_end/ic_1.png");
+  scene.load.image("ic_2", "assets/bg_end/ic_2.png");
+  scene.load.image("ic_3", "assets/bg_end/ic_3.png");
+  scene.load.image("ic_4", "assets/bg_end/ic_4.png");
+  scene.load.image("ic_6", "assets/bg_end/ic_6.png");
+  scene.load.image("ic_7", "assets/bg_end/ic_7.png");
+  scene.load.image("ic_8", "assets/bg_end/ic_8.png");
 }
 
 // Giữ hàm cũ cho tương thích, nếu đâu đó vẫn gọi preloadAssets
