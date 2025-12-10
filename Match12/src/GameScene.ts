@@ -68,7 +68,7 @@ const HOLE_SLOPE_OFFSET_RATIO = 0.026;
 const HOLE_OFFSET_NUMBER_DX = [0.139, 0.133, 0.138, 0.138];
 const HOLE_OFFSET_NUMBER_DY = [-0.06, -0.048, -0.04, -0.017];
 const HOLE_OFFSET_OBJECT_DX = [-0.138, -0.133, -0.133, -0.138];
-const HOLE_OFFSET_OBJECT_DY = [-0.06, -0.048, -0.04, -0.019];
+const HOLE_OFFSET_OBJECT_DY = [-0.06, -0.064, -0.048, -0.019];
 
 
 // Tay hướng dẫn
@@ -110,7 +110,7 @@ function shuffle<T>(arr: T[]): T[] {
 function buildOneTwoLevels(): LevelConfig[] {
   // Dùng cùng 4 asset cho nhiều màn, mỗi màn đổi pattern số và trộn thứ tự
   const bgKeys = ["bg1", "bg2", "bg3", "bg4", "bg5"];
-  const charKeys = ["char1", "char2", "char1"];
+  const charKeys = ["char1", "char2", "char1", "char2", "char1"];
 
   const levels: LevelConfig[] = [];
 
@@ -676,12 +676,21 @@ export default class GameScene extends Phaser.Scene {
 
         // Giới hạn chiều cao icon để không tràn thẻ
         // Kích thước scale trước là 1 icon sau là 2 icon 
-        const maxIconHeight = cardH * (count === 1 ? 1.14 : 1.14);
+        const maxIconHeight = cardH * (count === 1 ? 1.12 : 1.12);
         let iconScale = maxIconHeight / aH;
 
         // ===== BOOST RIÊNG ICON TRỐNG =====
         if (item.asset === "drum") {
           iconScale *= 1.5;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+        }
+        if (item.asset === "marble") {
+          iconScale *= 0.9;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+        }
+        if (item.asset === "babie") {
+          iconScale *= 0.95;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+        }
+        if (item.asset === "bear") {
+          iconScale *= 0.96;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
         }
         // Không cho phóng to hơn kích thước gốc
         if (iconScale > 1) {
