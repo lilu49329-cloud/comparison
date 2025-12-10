@@ -2,7 +2,7 @@
 
 import Phaser from "phaser";
 import { preloadGameAssets, BUTTON_ASSET_URLS } from "./assetLoader";
-import { playRandomVoice } from "./audioUtils";
+import AudioManager from "./AudioManager";
 
 // ========== TYPES ==========
 interface CardData {
@@ -148,11 +148,11 @@ function buildOneTwoLevels(): LevelConfig[] {
 // ========== MAIN CLASS ==========
 export default class GameScene extends Phaser.Scene {
   private correctVoices: string[] = [
-  'correct_1',
-  'correct_2',
-  'correct_3',
-  'correct_4',
-];
+    'correct_answer_1',
+    'correct_answer_2',
+    'correct_answer_3',
+    'correct_answer_4',
+  ];
 
   levels: LevelConfig[];
   level: number = 0;
@@ -331,21 +331,22 @@ export default class GameScene extends Phaser.Scene {
     
 
     // ===== BGM =====
-    let bgm = this.sound.get("bgm_main") as Phaser.Sound.BaseSound | null;
-    if (!bgm) {
-      bgm = this.sound.add("bgm_main", { loop: true, volume: 0.28 });
-      bgm.play();
-    } else if (!bgm.isPlaying) {
-      bgm.play();
-    }
-    this.bgm = bgm;
+    // Dùng AudioManager để phát nhạc nền (nếu có key trong SOUND_MAP)
+    // Không cần lưu bgm vào this.bgm nữa vì AudioManager quản lý
 
-    // ===== VOICE INTRO – chỉ phát 1 lần ở level đầu =====
-    const introPlayed = (window as any)._voiceIntroPlayed as boolean | undefined;
-    if (!introPlayed && this.level === 0) {
-      (window as any)._voiceIntroPlayed = true;
-      this.sound.play("voice_intro");
-    }
+    this.input.once("pointerdown", () => {
+  // 1. Bật nhạc nền (loop xuyên suốt)
+  AudioManager.play("bgm_main");
+
+  // 2. Chờ một chút rồi phát voice_intro
+  this.time.delayedCall(10, () => {
+    if (this.level === 0) {
+  AudioManager.play("voice_intro");
+}
+
+  });
+});
+
 
     const level = this.levels[this.level];
 
@@ -422,22 +423,6 @@ export default class GameScene extends Phaser.Scene {
           const charFrame = charImg.texture.getSourceImage();
           const charOrigW = charFrame.width || charImg.texture.get().width;
           const charOrigH = charFrame.height || charImg.texture.get().height;
-          console.log(
-            "CHAR texture:",
-            charImg.texture.key,
-            "goc:",
-            charOrigW,
-            charOrigH,
-            "size:",
-            charImg.width,
-            charImg.height,
-            "displaySize:",
-            charImg.displayWidth,
-            charImg.displayHeight,
-            "scale:",
-            charImg.scaleX,
-            charImg.scaleY
-          );
         } else {
           this.add
             .text(charX, charY, "😊", {
@@ -506,22 +491,6 @@ export default class GameScene extends Phaser.Scene {
       const boardFrame = boardImg.texture.getSourceImage();
       const boardOrigW2 = boardFrame.width || boardImg.texture.get().width;
       const boardOrigH2 = boardFrame.height || boardImg.texture.get().height;
-      console.log(
-        "BOARD texture:",
-        boardImg.texture.key,
-        "goc:",
-        boardOrigW2,
-        boardOrigH2,
-        "size:",
-        boardImg.width,
-        boardImg.height,
-        "displaySize:",
-        boardImg.displayWidth,
-        boardImg.displayHeight,
-        "scale:",
-        boardImg.scaleX,
-        boardImg.scaleY
-      );
     }
 
     const colObjX = boardX - boardW * 0.25;
@@ -551,22 +520,6 @@ export default class GameScene extends Phaser.Scene {
       const cardFrame = card.texture.getSourceImage();
       const cardOrigW = cardFrame.width || card.texture.get().width;
       const cardOrigH = cardFrame.height || card.texture.get().height;
-      console.log(
-        "CARD texture:",
-        card.texture.key,
-        "goc:",
-        cardOrigW,
-        cardOrigH,
-        "size:",
-        card.width,
-        card.height,
-        "displaySize:",
-        card.displayWidth,
-        card.displayHeight,
-        "scale:",
-        card.scaleX,
-        card.scaleY
-      );
 
       const hoverTint = 0xfff9c4;
       const activeTint = 0xffe082;
@@ -627,22 +580,6 @@ export default class GameScene extends Phaser.Scene {
       const card2Frame = card.texture.getSourceImage();
       const card2OrigW = card2Frame.width || card.texture.get().width;
       const card2OrigH = card2Frame.height || card.texture.get().height;
-      console.log(
-        "CARD2 texture:",
-        card.texture.key,
-        "goc:",
-        card2OrigW,
-        card2OrigH,
-        "size:",
-        card.width,
-        card.height,
-        "displaySize:",
-        card.displayWidth,
-        card.displayHeight,
-        "scale:",
-        card.scaleX,
-        card.scaleY
-      );
 
       const dropHoverTint = 0xc8e6ff;
 
@@ -665,16 +602,6 @@ export default class GameScene extends Phaser.Scene {
         const iconFrame = tmp.texture.getSourceImage();
         const iconOrigW = iconFrame.width || tmp.texture.get().width;
         const iconOrigH = iconFrame.height || tmp.texture.get().height;
-        console.log(
-          "ICON texture:",
-          tmp.texture.key,
-          "goc:",
-          iconOrigW,
-          iconOrigH,
-          "size:",
-          aW,
-          aH
-        );
         tmp.destroy();
 
         const count = item.number;
@@ -716,19 +643,6 @@ export default class GameScene extends Phaser.Scene {
 
         iconScale = Math.round(iconScale * 1000) / 1000;
 
-        console.log("ICON scale calc:", {
-          asset: item.asset,
-          count,
-          cardW,
-          cardH,
-          aW,
-          aH,
-          maxIconHeight,
-          iconWidthScaled: aW * iconScale,
-          totalWidth: count * aW * iconScale + (count - 1) * Math.abs(gapX),
-          maxWidth,
-          iconScale,
-        });
 
         const stepX = aW * iconScale + gapX;
         const groupWidth = aW * iconScale + (count - 1) * stepX;
@@ -743,16 +657,6 @@ export default class GameScene extends Phaser.Scene {
             .image(startX + k * stepX, y + iconYOffset, item.asset) // 🔴 đổi y -> y + iconYOffset
             .setOrigin(0.5, 0.5)
             .setScale(iconScale);
-          console.log(
-            "ICON render:",
-            iconImg.texture.key,
-            "displaySize:",
-            iconImg.displayWidth,
-            iconImg.displayHeight,
-            "scale:",
-            iconImg.scaleX,
-            iconImg.scaleY
-          );
         }
 
       }
@@ -887,11 +791,8 @@ export default class GameScene extends Phaser.Scene {
           const playLocked = (window as any).playVoiceLocked as
             | ((s: Phaser.Sound.BaseSoundManager, k: string) => void)
             | undefined;
-          if (playLocked) {
-            playLocked(this.sound, "sfx_wrong");
-          } else {
-            this.sound.play("sfx_wrong");
-          }
+          // Phát âm sai qua AudioManager
+          AudioManager.play("sfx_wrong");
         }
 
         // Đúng chỉ khi số khớp và thẻ vật CHƯA được nối
@@ -899,9 +800,9 @@ export default class GameScene extends Phaser.Scene {
           matched = true;
           this.matches[startIndex] = true;
 
-          this.sound.play("sfx_correct");
-          playRandomVoice(this.sound, this.correctVoices);
-          //this.sound.play('correct_1')
+          AudioManager.play("sfx_correct");
+          // Phát random correct answer qua AudioManager
+          AudioManager.playCorrectAnswer();
 
           startCard.clearTint();
           objCard.clearTint();
@@ -965,14 +866,8 @@ export default class GameScene extends Phaser.Scene {
 
       if (this.matches.every((m) => m)) {
         this.time.delayedCall(1500, () => {
-          const playLocked = (window as any).playVoiceLocked as
-            | ((s: Phaser.Sound.BaseSoundManager, k: string) => void)
-            | undefined;
-          if (playLocked) {
-            playLocked(this.sound, "voice_complete");
-          } else {
-            this.sound.play("voice_complete");
-          }
+          // Phát voice_complete qua AudioManager
+          AudioManager.play("voice_complete");
 
           // Tự động chuyển màn sau khi phát âm hoàn thành
           this.time.delayedCall(100, () => {
