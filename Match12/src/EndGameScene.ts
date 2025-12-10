@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import AudioManager from "./AudioManager";
 
 function hideGameButtons() {
   (window as any).setGameButtonsVisible?.(false);
@@ -40,7 +41,7 @@ export default class EndGameScene extends Phaser.Scene {
 
         (this.scene.get('CompareScene') as any)?.stopAllVoices?.();
 
-        this.sound.play('complete');
+        AudioManager.play("complete");
 
         this.containerEl = document.getElementById('game-container');
         if (this.containerEl) {
@@ -48,8 +49,8 @@ export default class EndGameScene extends Phaser.Scene {
         }
 
         this.time.delayedCall(2000, () => {
-            this.sound.play('fireworks');
-            this.sound.play('applause');
+            AudioManager.play("fireworks");
+            AudioManager.play("applause");
         });
 
         this.add
@@ -91,8 +92,10 @@ export default class EndGameScene extends Phaser.Scene {
             .setInteractive({ useHandCursor: true });
 
         replayBtn.on('pointerdown', () => {
-            this.sound.stopAll();
-            this.sound.play('sfx_click');
+            AudioManager.stop("complete");
+            AudioManager.stop("fireworks");
+            AudioManager.stop("applause");
+            AudioManager.play("sfx_click");
             this.clearDimBackground();
             this.stopConfetti();
             this.scene.stop('EndGameScene');
@@ -110,8 +113,11 @@ export default class EndGameScene extends Phaser.Scene {
             .setInteractive({ useHandCursor: true });
 
         exitBtn.on('pointerdown', () => {
-            this.sound.stopAll();
-            this.sound.play('sfx-click');
+            AudioManager.stop("complete");
+            AudioManager.stop("fireworks");
+            AudioManager.stop("applause");
+            AudioManager.stop("bgm_main");
+            AudioManager.play("sfx_click");
             this.clearDimBackground();
             this.stopConfetti();
             this.scene.start('LessonSelectScene');

@@ -8,31 +8,31 @@ export const BUTTON_ASSET_URLS = {
 
 // Chỉ load những asset cần cho màn intro
 export function preloadIntroAssets(scene: Phaser.Scene): void {
-  // AUDIO: chỉ cần nhạc nền + voice_intro
-  scene.load.audio("voice_intro", "assets/audio/voice_intro.ogg");
-  scene.load.audio("bgm_main", "assets/audio/bgm_main.ogg");
+  // // AUDIO: chỉ cần nhạc nền + voice_intro
+  // scene.load.audio("voice_intro", "assets/audio/voice_intro.ogg");
+  // scene.load.audio("bgm_main", "assets/audio/bgm_main.ogg");
 }
 
 
 // Load toàn bộ asset dùng trong game (GameScene + EndGameScene)
 export function preloadGameAssets(scene: Phaser.Scene): void {
-  // --- AUDIO ---
-  scene.load.audio("voice_intro", "assets/audio/voice_intro.mp3");
-  scene.load.audio("voice_complete", "assets/audio/complete.mp3");
-  scene.load.audio("voice_need_finish", "assets/audio/voice_need_finish.mp3");
-  scene.load.audio("sfx_correct", "assets/audio/correct.mp3");
-  scene.load.audio("sfx_wrong", "assets/audio/wrong.mp3");
-  scene.load.audio("bgm_main", "assets/audio/bgm_main.mp3");
-  scene.load.audio("voice_end", "assets/audio/voice_end.mp3");
-  scene.load.audio("voice_rotate", "assets/audio/xoay.mp3");
-  scene.load.audio("correct_1", "assets/audio/correct_answer_1.mp3");
-  scene.load.audio("correct_2", "assets/audio/correct_answer_2.mp3");
-  scene.load.audio("correct_3", "assets/audio/correct_answer_3.mp3");
-  scene.load.audio("correct_4", "assets/audio/correct_answer_4.mp3");
-  scene.load.audio("complete", "assets/audio/vic_sound.mp3");
-  scene.load.audio("fireworks", "assets/audio/fireworks.mp3");
-  scene.load.audio("applause", "assets/audio/applause.mp3");
-  scene.load.audio("sfx_click", "assets/audio/click.mp3");
+  // // --- AUDIO ---
+  // scene.load.audio("voice_intro", "assets/audio/voice_intro.mp3");
+  // scene.load.audio("voice_complete", "assets/audio/complete.mp3");
+  // scene.load.audio("voice_need_finish", "assets/audio/voice_need_finish.mp3");
+  // scene.load.audio("sfx_correct", "assets/audio/correct.mp3");
+  // scene.load.audio("sfx_wrong", "assets/audio/wrong.mp3");
+  // scene.load.audio("bgm_main", "assets/audio/bgm_main.mp3");
+  // scene.load.audio("voice_end", "assets/audio/voice_end.mp3");
+  // scene.load.audio("voice_rotate", "assets/audio/xoay.mp3");
+  // scene.load.audio("correct_1", "assets/audio/correct_answer_1.mp3");
+  // scene.load.audio("correct_2", "assets/audio/correct_answer_2.mp3");
+  // scene.load.audio("correct_3", "assets/audio/correct_answer_3.mp3");
+  // scene.load.audio("correct_4", "assets/audio/correct_answer_4.mp3");
+  // scene.load.audio("complete", "assets/audio/vic_sound.mp3");
+  // scene.load.audio("fireworks", "assets/audio/fireworks.mp3");
+  // scene.load.audio("applause", "assets/audio/applause.mp3");
+  // scene.load.audio("sfx_click", "assets/audio/click.mp3");
   // --- BACKGROUND ---
   scene.load.image("bg1", "assets/bg/bg1.jpg");
   scene.load.image("bg2", "assets/bg/bg2.jpg");
@@ -44,7 +44,6 @@ export function preloadGameAssets(scene: Phaser.Scene): void {
   scene.load.image("char2", "assets/char/char2.png");
 
   // --- BUTTONS ---
-  scene.load.image("btn_start", "assets/button/btn_start.png");
   scene.load.image("replay_endgame", "assets/button/replay_endgame.png");
   scene.load.image("replay_svg", BUTTON_ASSET_URLS.replay_svg);
   scene.load.image("next_svg", BUTTON_ASSET_URLS.next_svg);
@@ -54,7 +53,6 @@ export function preloadGameAssets(scene: Phaser.Scene): void {
   scene.load.image("card2", "assets/card/card2.png");
   scene.load.image("card_yellow", "assets/card/card_yellow.png");
   scene.load.image("card_yellow2", "assets/card/card_yellow2.png");
-  scene.load.image("card_glow", "assets/card/card_glow.png");
   scene.load.image("line_glow", "assets/card/line_glow.png");
   scene.load.image("board", "assets/card/board.png");
   scene.load.image('text', 'assets/card/text.png');
