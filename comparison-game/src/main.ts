@@ -1,3 +1,21 @@
+// ===== UNLOCK AUDIO FOR IOS SILENT MODE =====
+function unlockIOSAudio() {
+  // Dùng Howler để phát âm thanh nhỏ, chỉ cần gọi 1 lần sau user gesture
+  try {
+    // Nên dùng file click.mp3 hoặc file ngắn, nhỏ
+    const silent = new (window as any).Howl({
+      src: ['assets/audio/click.mp3'],
+      volume: 0.01
+    });
+    silent.play();
+  } catch (e) {
+    // ignore
+  }
+  window.removeEventListener('touchend', unlockIOSAudio);
+  window.removeEventListener('click', unlockIOSAudio);
+}
+window.addEventListener('touchend', unlockIOSAudio, { once: true });
+window.addEventListener('click', unlockIOSAudio, { once: true });
 import Phaser from "phaser";
 import PreloadScene from "./PreloadScene";
 // import OverlayScene from "./OverlayScene";
