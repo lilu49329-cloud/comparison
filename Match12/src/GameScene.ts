@@ -955,7 +955,7 @@ export default class GameScene extends Phaser.Scene {
       this.dragStartIdx = null;
 
       if (this.matches.every((m) => m)) {
-        this.time.delayedCall(2000, () => {
+        this.time.delayedCall(1500, () => {
           const playLocked = (window as any).playVoiceLocked as
             | ((s: Phaser.Sound.BaseSoundManager, k: string) => void)
             | undefined;
@@ -966,7 +966,7 @@ export default class GameScene extends Phaser.Scene {
           }
 
           // Tự động chuyển màn sau khi phát âm hoàn thành
-          this.time.delayedCall(800, () => {
+          this.time.delayedCall(100, () => {
             const nextIndex = this.level + 1;
             if (nextIndex >= this.levels.length) {
               this.scene.start("EndGameScene");
