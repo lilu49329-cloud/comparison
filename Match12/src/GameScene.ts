@@ -62,14 +62,14 @@ const LINE_THICKNESS_FACTOR = 0.55;
 //const LINE_TRIM_FACTOR = 0.12;
 
 // Độ lệch lỗ theo đường chéo (chưa dùng, để 0)
-const HOLE_SLOPE_OFFSET_RATIO = 0.03;
+const HOLE_SLOPE_OFFSET_RATIO = 0.026;
 
 // Offset tinh chỉnh theo index từng thẻ
 const HOLE_OFFSET_NUMBER_DX = [0.139, 0.133, 0.138, 0.138];
-const HOLE_OFFSET_NUMBER_DY = [-0.038, -0.027, -0.030, -0.017];
-
+const HOLE_OFFSET_NUMBER_DY = [-0.06, -0.048, -0.04, -0.017];
 const HOLE_OFFSET_OBJECT_DX = [-0.138, -0.133, -0.133, -0.138];
-const HOLE_OFFSET_OBJECT_DY = [-0.034, -0.034, -0.014, -0.019];
+const HOLE_OFFSET_OBJECT_DY = [-0.06, -0.048, -0.04, -0.019];
+
 
 // Tay hướng dẫn
 const HAND_ASSET_KEY = "hand";
