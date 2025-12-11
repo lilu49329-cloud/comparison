@@ -122,9 +122,9 @@ let game: Phaser.Game | null = null;
 // ========== GLOBAL BGM (CHẠY XUYÊN SUỐT GAME) ==========
 
 export function ensureBgmStarted() {
-  console.log("[BGM] ensure play bgm_main");
-  AudioManager.stop("bgm_main");
-  AudioManager.play("bgm_main");
+  // console.log("[BGM] ensure play bgm_main");
+  // AudioManager.stop("bgm_main");
+  // AudioManager.play("bgm_main");
 }
 
 
