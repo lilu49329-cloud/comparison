@@ -122,28 +122,25 @@ class AudioManager {
      * @param {string} id - ID âm thanh
      * @returns {number | undefined} - Sound ID của Howler
      */
-    play(id: string): number | undefined {
-    if (!this.isLoaded || !this.sounds[id]) {
-      console.warn(
-        `[AudioManager] Sound ID not found or not loaded: ${id}`
-      );
-      return;
-    }
+   // src/AudioManager.ts
 
-    if (id === "bgm_main") {
-      const bgm = this.sounds[id];
-      if (bgm.playing()) {
-        return;
-      }
-    }
-
-    return this.sounds[id].play();
+play(id: string): number | undefined {
+  if (!this.isLoaded || !this.sounds[id]) {
+    console.warn(
+      `[AudioManager] Sound ID not found or not loaded: ${id}`
+    );
+    return;
   }
 
-  isPlaying(id: string): boolean {
-    const sound = this.sounds[id];
-    return !!sound && sound.playing();
-  }
+  // Bỏ hoàn toàn phần if (id === "bgm_main") ...
+  return this.sounds[id].play();
+}
+
+isPlaying(id: string): boolean {
+  const sound = this.sounds[id];
+  return !!sound && sound.playing();
+}
+
 
 
     /**

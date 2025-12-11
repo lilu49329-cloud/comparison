@@ -120,26 +120,24 @@ if (container instanceof HTMLDivElement) {
 let game: Phaser.Game | null = null;
 // ========== GLOBAL BGM (CHẠY XUYÊN SUỐT GAME) ==========
 // ========== GLOBAL BGM (CHẠY XUYÊN SUỐT GAME) ==========
-export function ensureBgmStarted() {
-  // Nếu BGM đang chạy rồi thì thôi
-  if (AudioManager.isPlaying("bgm_main")) {
-    return;
-  }
 
+export function ensureBgmStarted() {
   console.log("[BGM] ensure play bgm_main");
+  AudioManager.stop("bgm_main");
   AudioManager.play("bgm_main");
 }
 
 
-function setupGlobalBgm() {
-  const startBgm = () => {
-    ensureBgmStarted();
-  };
 
-  ["pointerdown", "touchstart", "mousedown"].forEach((ev) => {
-    document.addEventListener(ev, startBgm, { once: true });
-  });
-}
+// function setupGlobalBgm() {
+//   const startBgm = () => {
+//     ensureBgmStarted();
+//   };
+
+//   ["pointerdown", "touchstart", "mousedown"].forEach((ev) => {
+//     document.addEventListener(ev, startBgm, { once: true });
+//   });
+// }
 
 
 // Cố gắng resume AudioContext khi overlay bật/tắt
@@ -237,7 +235,7 @@ async function initGame() {
   }
 
   // Bật nhạc nền 1 lần, loop xuyên suốt game (sau user gesture)
-  setupGlobalBgm();
+  // setupGlobalBgm();
 
   if (!game) {
     // setRandomIntroViewportBg();
