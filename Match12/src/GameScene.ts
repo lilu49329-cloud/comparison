@@ -600,29 +600,47 @@ this.input.once("pointerdown", () => {
         tmp.destroy();
 
         const count = item.number;
-        const gapX = -5;
+        let gapX = -5;
+        // Thu nhỏ khoảng cách khi có 2 trống / 2 ô màu
+        if (
+          count === 2 &&
+          (item.asset === "drum" || item.asset === "red" || item.asset === "yellow")
+        ) {
+          gapX = -20;
+        }
 
         // Giới hạn chiều cao icon để không tràn thẻ
         // Kích thước scale trước là 1 icon sau là 2 icon 
         const maxIconHeight = cardH * (count === 1 ? 1.12 : 1.12);
         let iconScale = maxIconHeight / aH;
 
-        // ===== BOOST RIÊNG ICON TRỐNG =====
+        // ===== BOOST RIÊNG MỘT SỐ ICON =====
         if (item.asset === "drum") {
-          iconScale *= 1.5;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+          // Trống thường nhỏ → boost lớn hơn
+          iconScale *= 1.35;
         }
         if (item.asset === "marble") {
-          iconScale *= 0.9;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+          iconScale *= 0.9;
         }
         if (item.asset === "babie") {
-          iconScale *= 0.95;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+          iconScale *= 0.95;
         }
         if (item.asset === "bear") {
-          iconScale *= 0.96;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+          iconScale *= 0.96;
         }
-        // Không cho phóng to hơn kích thước gốc
-        if (iconScale > 1) {
-          iconScale = 1;
+        if (item.asset === "red" || item.asset === "yellow") {
+          iconScale *= 1.3;
+        }
+
+        // Giới hạn scale tối đa theo từng asset
+        let maxScale = 1;
+        if (item.asset === "drum") {
+          maxScale = 2.0;
+        } else if (item.asset === "red" || item.asset === "yellow") {
+          maxScale = 1.7;
+        }
+        if (iconScale > maxScale) {
+          iconScale = maxScale;
         }
 
         const iconWidthScaled = aW * iconScale;
@@ -644,9 +662,25 @@ this.input.once("pointerdown", () => {
         // 👉 ĐẨY TOÀN BỘ ICON LÊN MỘT CHÚT
         const iconYOffset = -cardH * 0.015; // 1% chiều cao thẻ, thích thì chỉnh 0.01 / 0.02
 
+        // Offset riêng cho từng asset (căn lại vị trí)
+        let extraOffsetX = 0;
+        let extraOffsetY = 0;
+
+        if (item.asset === "rabbit") {
+          // Đẩy thỏ lên cao hơn một chút
+          extraOffsetY = -cardH * 0.06;
+        } else if (item.asset === "marble") {
+          // Đẩy bi lên cao hơn một chút
+          extraOffsetY = -cardH * 0.05;
+        }
+
         for (let k = 0; k < count; k++) {
           const iconImg = this.add
-            .image(startX + k * stepX, y + iconYOffset, item.asset) // 🔴 đổi y -> y + iconYOffset
+            .image(
+              startX + k * stepX + extraOffsetX,
+              y + iconYOffset + extraOffsetY,
+              item.asset
+            )
             .setOrigin(0.5, 0.5)
             .setScale(iconScale);
         }
@@ -978,4 +1012,3 @@ this.input.once("pointerdown", () => {
     return this.matches.every((m) => m);
   }
 }
-

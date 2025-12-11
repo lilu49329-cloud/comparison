@@ -65,7 +65,7 @@ class AudioManager {
         // Cấu hình quan trọng cho iOS
         Howler.autoUnlock = true;
         Howler.volume(1.0);
-        (Howler as any).html5PoolSize = 32;
+        (Howler as any).html5PoolSize = 100;
     }
 
     /**
