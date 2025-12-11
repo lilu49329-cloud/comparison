@@ -120,22 +120,19 @@ if (container instanceof HTMLDivElement) {
 let game: Phaser.Game | null = null;
 // ========== GLOBAL BGM (CHẠY XUYÊN SUỐT GAME) ==========
 let bgmStarted = false;
+export function ensureBgmStarted() {
+  if (bgmStarted) return;
+  bgmStarted = true;
+  console.log("[BGM] try play bgm_main");
+  AudioManager.play("bgm_main");
+}
 
 function setupGlobalBgm() {
   const startBgm = () => {
-    if (bgmStarted) return;
-    bgmStarted = true;
-    console.log("[BGM] try play bgm_main");
-    AudioManager.play("bgm_main");
+    ensureBgmStarted();
   };
 
-  const events: Array<keyof DocumentEventMap> = [
-    "pointerdown",
-    "touchstart",
-    "mousedown",
-  ];
-
-  events.forEach((ev) => {
+  ["pointerdown", "touchstart", "mousedown"].forEach((ev) => {
     document.addEventListener(ev, startBgm, { once: true });
   });
 }

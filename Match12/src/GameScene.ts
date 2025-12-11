@@ -329,7 +329,7 @@ export default class GameScene extends Phaser.Scene {
     // ===== BGM =====
 this.input.once("pointerdown", () => {
   // Bật BGM
-  AudioManager.play("bgm_main");
+  // AudioManager.play("bgm_main");
 
   // Sau một chút, nếu level 0 và CHƯA phát intro lần nào thì mới phát
   this.time.delayedCall(10, () => {
