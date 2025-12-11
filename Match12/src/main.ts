@@ -125,12 +125,21 @@ function setupGlobalBgm() {
   const startBgm = () => {
     if (bgmStarted) return;
     bgmStarted = true;
+    console.log("[BGM] try play bgm_main");
     AudioManager.play("bgm_main");
-    window.removeEventListener("pointerdown", startBgm);
   };
 
-  window.addEventListener("pointerdown", startBgm);
+  const events: Array<keyof DocumentEventMap> = [
+    "pointerdown",
+    "touchstart",
+    "mousedown",
+  ];
+
+  events.forEach((ev) => {
+    document.addEventListener(ev, startBgm, { once: true });
+  });
 }
+
 
 // Cố gắng resume AudioContext khi overlay bật/tắt
 function resumeSoundContext(scene: Phaser.Scene) {
