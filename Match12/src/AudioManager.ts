@@ -9,8 +9,9 @@ interface SoundConfig {
     volume?: number;
 }
 
-// 2. Đường dẫn gốc (Đảm bảo đường dẫn này đúng trong public folder của Vite)
-const BASE_PATH = '/assets/audio/'; // Sử dụng '/' cho Vite public folder
+// 2. Đường dẫn gốc tới thư mục audio (tương đối so với index.html trong dist)
+// Dùng 'assets/...' thay vì '/assets/...' để khi nhúng game vào sub-folder vẫn load đúng.
+const BASE_PATH = 'assets/audio/';
 
 // 3. Ánh xạ ID âm thanh (key) và cấu hình chi tiết
 const SOUND_MAP: Record<string, SoundConfig> = {
