@@ -47,8 +47,6 @@ const SOUND_MAP: Record<string, SoundConfig> = {
 
     "complete": { src: `${BASE_PATH}vic_sound.mp3` },
     "voice_intro": { src: `${BASE_PATH}voice_intro.mp3` },
-    "voice_end": { src: `${BASE_PATH}voice_end.mp3` },
-
     // ... Thêm các cặp còn lại vào SOUND_MAP ...
     "voice_need_finish": { src: `${BASE_PATH}voice_need_finish.mp3` },
 

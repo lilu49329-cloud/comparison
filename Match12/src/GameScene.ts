@@ -3,6 +3,7 @@
 import Phaser from "phaser";
 import { preloadGameAssets, BUTTON_ASSET_URLS } from "./assetLoader";
 import AudioManager from "./AudioManager";
+import { hasIntroPlayed, markIntroPlayed } from "./rotateOrientation";
 
 
 // ========== TYPES ==========
@@ -326,19 +327,18 @@ export default class GameScene extends Phaser.Scene {
     
 
     // ===== BGM =====
-    // Dùng AudioManager để phát nhạc nền (nếu có key trong SOUND_MAP)
-    // Không cần lưu bgm vào this.bgm nữa vì AudioManager quản lý
-
-    this.input.once("pointerdown", () => {
-  // 1. Bật nhạc nền (loop xuyên suốt)
+this.input.once("pointerdown", () => {
+  // Bật BGM
   AudioManager.play("bgm_main");
 
-  // 2. Chờ một chút rồi phát voice_intro
+  // Sau một chút, nếu level 0 và CHƯA phát intro lần nào thì mới phát
   this.time.delayedCall(10, () => {
-    if (this.level === 0) {
-  AudioManager.play("voice_intro");
-}
-
+    if (this.level === 0 && !hasIntroPlayed()) {
+      const id = AudioManager.play("voice_intro");
+      if (id !== undefined) {
+        markIntroPlayed();
+      }
+    }
   });
 });
 

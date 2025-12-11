@@ -17,6 +17,14 @@ const ROTATE_VOICE_COOLDOWN = 1500; // ms – 1.5s
 // Intro chỉ phát 1 lần cho cả game
 let introPlayedOnce = false;
 
+export function hasIntroPlayed(): boolean {
+    return introPlayedOnce;
+}
+
+export function markIntroPlayed(): void {
+    introPlayedOnce = true;
+}
+
 // ================== CẤU HÌNH CỐ ĐỊNH (DÙNG CHUNG) ==================
 type RotateConfig = {
     breakpoint: number; // max width để coi là màn nhỏ (mobile)
@@ -247,8 +255,10 @@ function updateRotateHint() {
         try {
             audioManager.play('bgm_main');
             if (!introPlayedOnce) {
-                audioManager.play('voice_intro');
-                introPlayedOnce = true;
+                const id = audioManager.play('voice_intro');
+                if (id !== undefined) {
+                    introPlayedOnce = true;
+                }
             }
         } catch (e) {
             console.warn('[Rotate] auto resume bgm/intro error:', e);
