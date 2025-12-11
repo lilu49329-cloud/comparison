@@ -44,7 +44,7 @@ const SOUND_MAP: Record<string, SoundConfig> = {
         loop: true,
         volume: 0.5, // tuỳ bạn, có thể giữ 1.0
         },
-
+        
     "complete": { src: `${BASE_PATH}vic_sound.mp3` },
     "voice_intro": { src: `${BASE_PATH}voice_intro.mp3` },
     // ... Thêm các cặp còn lại vào SOUND_MAP ...
@@ -60,6 +60,7 @@ class AudioManager {
     private sounds: Record<string, Howl> = {};
     private isLoaded: boolean = false;
 
+    
     constructor() {
         // Cấu hình quan trọng cho iOS
         Howler.autoUnlock = true;
@@ -122,23 +123,27 @@ class AudioManager {
      * @returns {number | undefined} - Sound ID của Howler
      */
     play(id: string): number | undefined {
-  if (!this.isLoaded || !this.sounds[id]) {
-    console.warn(
-      `[AudioManager] Sound ID not found or not loaded: ${id}`
-    );
-    return;
-  }
-
-  // Không cho BGM phát lại nếu nó đang chạy
-  if (id === "bgm_main") {
-    const bgm = this.sounds[id];
-    if (bgm.playing()) {
-      return; // đã phát rồi -> không restart nữa
+    if (!this.isLoaded || !this.sounds[id]) {
+      console.warn(
+        `[AudioManager] Sound ID not found or not loaded: ${id}`
+      );
+      return;
     }
+
+    if (id === "bgm_main") {
+      const bgm = this.sounds[id];
+      if (bgm.playing()) {
+        return;
+      }
+    }
+
+    return this.sounds[id].play();
   }
 
-  return this.sounds[id].play();
-}
+  isPlaying(id: string): boolean {
+    const sound = this.sounds[id];
+    return !!sound && sound.playing();
+  }
 
 
     /**

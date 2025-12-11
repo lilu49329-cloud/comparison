@@ -4,6 +4,7 @@ import Phaser from "phaser";
 import { preloadGameAssets, BUTTON_ASSET_URLS } from "./assetLoader";
 import AudioManager from "./AudioManager";
 import { hasIntroPlayed, markIntroPlayed } from "./rotateOrientation";
+import { ensureBgmStarted } from "./main";
 
 
 // ========== TYPES ==========
@@ -327,20 +328,19 @@ export default class GameScene extends Phaser.Scene {
     
 
     // ===== BGM =====
+// ===== INTRO (chỉ đọc 1 lần) =====
 this.input.once("pointerdown", () => {
-  // Bật BGM
-  // AudioManager.play("bgm_main");
-
-  // Sau một chút, nếu level 0 và CHƯA phát intro lần nào thì mới phát
-  this.time.delayedCall(10, () => {
-    if (this.level === 0 && !hasIntroPlayed()) {
+  ensureBgmStarted();
+  if (this.level === 0 && !hasIntroPlayed()) {
+    this.time.delayedCall(5, () => {
       const id = AudioManager.play("voice_intro");
       if (id !== undefined) {
         markIntroPlayed();
       }
-    }
-  });
+    });
+  }
 });
+
 
 
     const level = this.levels[this.level];

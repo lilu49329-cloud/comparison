@@ -119,13 +119,17 @@ if (container instanceof HTMLDivElement) {
 // Giữ tham chiếu game để tránh tạo nhiều lần (HMR, reload…)
 let game: Phaser.Game | null = null;
 // ========== GLOBAL BGM (CHẠY XUYÊN SUỐT GAME) ==========
-let bgmStarted = false;
+// ========== GLOBAL BGM (CHẠY XUYÊN SUỐT GAME) ==========
 export function ensureBgmStarted() {
-  if (bgmStarted) return;
-  bgmStarted = true;
-  console.log("[BGM] try play bgm_main");
+  // Nếu BGM đang chạy rồi thì thôi
+  if (AudioManager.isPlaying("bgm_main")) {
+    return;
+  }
+
+  console.log("[BGM] ensure play bgm_main");
   AudioManager.play("bgm_main");
 }
+
 
 function setupGlobalBgm() {
   const startBgm = () => {

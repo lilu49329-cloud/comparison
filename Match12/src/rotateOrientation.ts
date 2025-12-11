@@ -252,17 +252,17 @@ function updateRotateHint() {
             currentVoiceKey = null;
         }
 
-        // Khi xoay ngang lại: bật lại BGM và intro (intro chỉ đọc 1 lần)
-        try {
-            if (!introPlayedOnce) {
-                const id = audioManager.play('voice_intro');
-                if (id !== undefined) {
-                    introPlayedOnce = true;
-                }
-            }
-        } catch (e) {
-            console.warn('[Rotate] auto resume bgm/intro error:', e);
-        }
+        // // Khi xoay ngang lại: bật lại BGM và intro (intro chỉ đọc 1 lần)
+        // try {
+        //     if (!introPlayedOnce) {
+        //         const id = audioManager.play('voice_intro');
+        //         if (id !== undefined) {
+        //             introPlayedOnce = true;
+        //         }
+        //     }
+        // } catch (e) {
+        //     console.warn('[Rotate] auto resume bgm/intro error:', e);
+        // }
     }
 }
 
