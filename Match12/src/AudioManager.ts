@@ -88,9 +88,11 @@ class AudioManager {
 
                 this.sounds[key] = new Howl({
                     src: [config.src],
-                    loop: config.loop || false,
-                    volume: config.volume || 1.0,
-                    html5: true, // Cần thiết cho iOS
+                    loop: config.loop ?? false,
+                    volume: config.volume ?? 1.0,
+                    // Cho phép cấu hình riêng: mặc định giữ html5 = true,
+                    // riêng bgm_main đã set html5: false để dùng WebAudio.
+                    html5: config.html5 ?? true,
 
                     onload: () => {
                         loadedCount++;
