@@ -88,7 +88,7 @@ class AudioManager {
                     src: [config.src],
                     loop: config.loop || false,
                     volume: config.volume || 1.0,
-                    // html5: true, // Cần thiết cho iOS
+                    html5: true, // Cần thiết cho iOS
 
                     onload: () => {
                         loadedCount++;
@@ -134,15 +134,13 @@ play(id: string): number | undefined {
     return;
   }
 
-const sound = this.sounds[id];
+  // Bỏ hoàn toàn phần if (id === "bgm_main") ...
+  return this.sounds[id].play();
+}
 
-  if (id === "bgm_main") {
-    // tránh đăng ký nhiều lần
-    sound.off("end");
-    sound.on("end", () => sound.play());
-  }
-
-  return sound.play();
+isPlaying(id: string): boolean {
+  const sound = this.sounds[id];
+  return !!sound && sound.playing();
 }
 
 
