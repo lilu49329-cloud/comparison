@@ -145,13 +145,13 @@ export function ensureBgmStarted() {
 
 
 // Cố gắng resume AudioContext khi overlay bật/tắt
-function resumeSoundContext(scene: Phaser.Scene) {
-  const sm = scene.sound as any;
-  const ctx: AudioContext | undefined = sm.context || sm.audioContext;
-  if (ctx && ctx.state === "suspended" && typeof ctx.resume === "function") {
-    ctx.resume();
-  }
-}
+// function resumeSoundContext(scene: Phaser.Scene) {
+//   const sm = scene.sound as any;
+//   const ctx: AudioContext | undefined = sm.context || sm.audioContext;
+//   if (ctx && ctx.state === "suspended" && typeof ctx.resume === "function") {
+//     ctx.resume();
+//   }
+// }
 // Cho các Scene gọi qua window
 (Object.assign(window as any, {
   setRandomIntroViewportBg,
