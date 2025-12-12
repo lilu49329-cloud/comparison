@@ -641,13 +641,19 @@ this.input.once("pointerdown", () => {
         const groupWidth = aW * iconScale + (count - 1) * stepX;
 
         const startX = colNumX - groupWidth / 2 + (aW * iconScale) / 2;
+        
+        // ✅ DỊCH RIÊNG ICON "spoon" SANG PHẢI
+        let groupOffsetX = 0;
+        if (item.asset === "spoon") {
+          groupOffsetX = cardW * 0.03; // ~3% chiều rộng thẻ (tự chỉnh 0.02 / 0.04 / ...)
+        }
 
         // 👉 ĐẨY TOÀN BỘ ICON LÊN MỘT CHÚT
         const iconYOffset = -cardH * 0.015; // 1% chiều cao thẻ, thích thì chỉnh 0.01 / 0.02
 
         for (let k = 0; k < count; k++) {
           const iconImg = this.add
-            .image(startX + k * stepX, y + iconYOffset, item.asset) // 🔴 đổi y -> y + iconYOffset
+            .image(startX + groupOffsetX + k * stepX, y + iconYOffset, item.asset)
             .setOrigin(0.5, 0.5)
             .setScale(iconScale);
         }
@@ -712,6 +718,12 @@ this.input.once("pointerdown", () => {
     this.numbers.forEach((numCard, idx) => {
       numCard.on("pointerdown", () => {
         if (this.matches[idx]) return;
+        // Nếu voice_intro vẫn đang phát mà user bắt đầu nối,
+        // dừng toàn bộ audio rồi bật lại BGM để tránh chồng tiếng.
+        if (AudioManager.isPlaying("voice_intro")) {
+          AudioManager.stopAll();
+          ensureBgmStarted();
+        }
 
         this.isDragging = true;
         this.dragStartIdx = idx;
