@@ -67,8 +67,8 @@ export default class BalanceScene extends Phaser.Scene {
   private boySide: 'LEFT' | 'RIGHT' = 'RIGHT';
   private upgradeCharacter: 'GIRL' | 'BOY' = 'GIRL';
   private nextSceneKey = 'GameScene';
-  private score = 0;
-  private levelIndex = 0;
+  public score = 0;
+  public levelIndex = 0;
 
   constructor() {
     super('BalanceScene');

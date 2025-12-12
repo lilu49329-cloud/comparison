@@ -185,9 +185,28 @@ function setupHtmlButtons() {
   if (replayBtn) {
     replayBtn.addEventListener("click", () => {
       if (!game) return;
-      const scene = game.scene.getScene("GameScene") as GameScene;
+
+      // Dừng toàn bộ âm thanh trước khi chơi lại để tránh lồng nhau
+      AudioManager.stopAll();
+
+      // Nếu đang ở màn phụ (BalanceScene) → dừng màn phụ và quay lại GameScene của level hiện tại
+      const balance = game.scene.getScene("BalanceScene") as BalanceScene | null;
+      if (balance && balance.scene.isActive()) {
+        const levelIndex = balance.levelIndex ?? 0;
+        const score = balance.score ?? 0;
+
+        game.scene.stop("BalanceScene");
+        game.scene.start("GameScene", { levelIndex, score });
+        return;
+      }
+
+      // Ngược lại, đang ở GameScene → restart lại level hiện tại
+      const scene = game.scene.getScene("GameScene") as GameScene | null;
       if (!scene) return;
-      scene.scene.restart({ level: scene.level });
+      scene.scene.restart({
+        levelIndex: scene.levelIndex,
+        score: scene.score,
+      });
     });
   }
 

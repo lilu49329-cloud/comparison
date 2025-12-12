@@ -73,6 +73,8 @@ class AudioManager {
     // Khai báo kiểu dữ liệu cho Map chứa các đối tượng Howl
     private sounds: Record<string, Howl> = {};
     private isLoaded: boolean = false;
+    // Lưu thời điểm phát gần nhất của từng âm thanh (ms)
+    private lastPlayTimes: Record<string, number> = {};
 
     
     constructor() {
@@ -141,6 +143,15 @@ class AudioManager {
    // src/AudioManager.ts
 
 play(id: string): number | undefined {
+  const now = Date.now();
+  const cooldown = this.getCooldown(id);
+  const lastTime = this.lastPlayTimes[id] ?? 0;
+
+  // Nếu đang trong khoảng cooldown thì bỏ qua, tránh spam
+  if (cooldown > 0 && now - lastTime < cooldown) {
+    return;
+  }
+
   if (!this.isLoaded || !this.sounds[id]) {
     console.warn(
       `[AudioManager] Sound ID not found or not loaded: ${id}`
@@ -148,7 +159,8 @@ play(id: string): number | undefined {
     return;
   }
 
-  // Bỏ hoàn toàn phần if (id === "bgm_main") ...
+  this.lastPlayTimes[id] = now;
+
   return this.sounds[id].play();
 }
 
@@ -176,6 +188,21 @@ isPlaying(id: string): boolean {
 
     stopAll(): void {
         Howler.stop();
+    }
+
+    // Thiết lập cooldown riêng cho từng loại âm thanh (ms)
+    private getCooldown(id: string): number {
+        switch (id) {
+            case 'sfx_click':
+                return 200; // chống spam click nút chơi lại
+            case 'voice_intro':
+                return 3000;
+            case 'voice_complete':
+            case 'complete':
+                return 1500;
+            default:
+                return 0;
+        }
     }
 
     /**

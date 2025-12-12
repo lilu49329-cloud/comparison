@@ -92,9 +92,8 @@ export default class EndGameScene extends Phaser.Scene {
             .setInteractive({ useHandCursor: true });
 
         replayBtn.on('pointerdown', () => {
-            AudioManager.stop("complete");
-            AudioManager.stop("fireworks");
-            AudioManager.stop("applause");
+            // Dừng toàn bộ âm thanh đang chạy trước khi chơi lại
+            AudioManager.stopAll();
             AudioManager.play("sfx_click");
             this.clearDimBackground();
             this.stopConfetti();
@@ -113,10 +112,8 @@ export default class EndGameScene extends Phaser.Scene {
             .setInteractive({ useHandCursor: true });
 
         exitBtn.on('pointerdown', () => {
-            AudioManager.stop("complete");
-            AudioManager.stop("fireworks");
-            AudioManager.stop("applause");
-            AudioManager.stop("bgm_main");
+            // Dừng toàn bộ âm thanh (kể cả BGM) khi thoát
+            AudioManager.stopAll();
             AudioManager.play("sfx_click");
             this.clearDimBackground();
             this.stopConfetti();
