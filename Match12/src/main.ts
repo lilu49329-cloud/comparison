@@ -123,8 +123,10 @@ let game: Phaser.Game | null = null;
 
 export function ensureBgmStarted() {
   console.log("[BGM] ensure play bgm_main");
-  AudioManager.stop("bgm_main");
-  AudioManager.play("bgm_main");
+  // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
+  if (!AudioManager.isPlaying("bgm_main")) {
+    AudioManager.play("bgm_main");
+  }
 }
 
 

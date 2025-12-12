@@ -327,17 +327,15 @@ export default class GameScene extends Phaser.Scene {
 
     
 
-    // ===== BGM =====
+// ===== BGM =====
 // ===== INTRO (chỉ đọc 1 lần) =====
 this.input.once("pointerdown", () => {
   ensureBgmStarted();
   if (this.level === 0 && !hasIntroPlayed()) {
-    this.time.delayedCall(5, () => {
-      const id = AudioManager.play("voice_intro");
-      if (id !== undefined) {
-        markIntroPlayed();
-      }
-    });
+    const id = AudioManager.play("voice_intro");
+    if (id !== undefined) {
+      markIntroPlayed();
+    }
   }
 });
 
