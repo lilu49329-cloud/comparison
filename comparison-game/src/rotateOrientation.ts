@@ -258,6 +258,26 @@ function updateRotateHint() {
             currentVoiceKey = null;
         }
 
+        // Khi xoay ngang lại:
+        // - Đánh dấu audio question đã được "unlock"
+        // - Nếu GameScene đã đăng ký playCurrentQuestionVoice thì phát luôn câu hỏi,
+        //   để bé không cần chạm thêm lần nữa sau khi xoay ngang.
+        try {
+            (window as any).__questionAudioUnlocked__ = true;
+            const playQuestion =
+                (window as any).playCurrentQuestionVoice as
+                    | (() => void)
+                    | undefined;
+            if (typeof playQuestion === 'function') {
+                playQuestion();
+            }
+        } catch (e) {
+            console.warn(
+                '[Rotate] auto play question on rotate-off error:',
+                e
+            );
+        }
+
         // // Khi xoay ngang lại: bật lại BGM và intro (intro chỉ đọc 1 lần)
         // try {
         //     if (!introPlayedOnce) {
