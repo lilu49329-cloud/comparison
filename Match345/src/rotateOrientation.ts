@@ -1,7 +1,7 @@
 // src/rotateOrientation.ts
 import Phaser from 'phaser';
 import audioManager from './AudioManager';
-
+import { ensureBgmStarted } from "./main";
 // ================== STATE CHUNG ==================
 let rotateOverlay: HTMLDivElement | null = null;
 let isRotateOverlayActive = false;
@@ -16,6 +16,14 @@ const ROTATE_VOICE_COOLDOWN = 1500; // ms – 1.5s
 
 // Intro chỉ phát 1 lần cho cả game
 let introPlayedOnce = false;
+
+export function hasIntroPlayed(): boolean {
+    return introPlayedOnce;
+}
+
+export function markIntroPlayed(): void {
+    introPlayedOnce = true;
+}
 
 // ================== CẤU HÌNH CỐ ĐỊNH (DÙNG CHUNG) ==================
 type RotateConfig = {
@@ -127,7 +135,9 @@ function attachGlobalBlockInputListeners() {
         }
         ev.preventDefault();
 
-        // 2) Gọi phát voice-rotate (đã có cooldown bên trong playVoiceLocked)
+         // 2) LẦN ĐẦU bé chạm overlay -> bật BGM ở đây (gesture iOS cho phép)
+        ensureBgmStarted();
+        // 3) Gọi phát voice-rotate (đã có cooldown bên trong playVoiceLocked)
         try {
             playVoiceLocked(null as any, 'voice_rotate');
         } catch (err) {
@@ -227,7 +237,6 @@ function updateRotateHint() {
     if (overlayTurnedOn) {
         try {
             // Khi đang ở màn dọc: chỉ phát voice_rotate, tạm dừng nhạc/intro nếu có
-            audioManager.stop('bgm_main');
             audioManager.stop('voice_intro');
 
             playVoiceLocked(null as any, 'voice_rotate');
@@ -243,16 +252,17 @@ function updateRotateHint() {
             currentVoiceKey = null;
         }
 
-        // Khi xoay ngang lại: bật lại BGM và intro (intro chỉ đọc 1 lần)
-        try {
-            audioManager.play('bgm_main');
-            if (!introPlayedOnce) {
-                audioManager.play('voice_intro');
-                introPlayedOnce = true;
-            }
-        } catch (e) {
-            console.warn('[Rotate] auto resume bgm/intro error:', e);
-        }
+        // // Khi xoay ngang lại: bật lại BGM và intro (intro chỉ đọc 1 lần)
+        // try {
+        //     if (!introPlayedOnce) {
+        //         const id = audioManager.play('voice_intro');
+        //         if (id !== undefined) {
+        //             introPlayedOnce = true;
+        //         }
+        //     }
+        // } catch (e) {
+        //     console.warn('[Rotate] auto resume bgm/intro error:', e);
+        // }
     }
 }
 
