@@ -441,6 +441,11 @@ export default class GameScene extends Phaser.Scene {
 
   // ============ XỬ LÝ CHỌN =============
   private handleChoice(side: 'LEFT' | 'RIGHT') {
+    // Ngắt ngay voice câu hỏi, giữ nguyên nhạc nền
+    ['more_b', 'less_b', 'more_f', 'less_f'].forEach((key) => {
+      AudioManager.stopSound(key);
+    });
+
     if (this.gameState !== 'WAIT_CHOICE') return;
     this.gameState = 'CHECK_CHOICE';
 
