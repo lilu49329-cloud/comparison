@@ -3,7 +3,8 @@
 import Phaser from "phaser";
 import { preloadGameAssets, BUTTON_ASSET_URLS } from "./assetLoader";
 import AudioManager from "./AudioManager";
-
+import { ensureBgmStarted } from "./main";
+import { hasIntroPlayed, markIntroPlayed } from "./rotateOrientation";
 
 // ========== TYPES ==========
 interface CardData {
@@ -330,21 +331,16 @@ export default class GameScene extends Phaser.Scene {
 
     
 
-    // ===== BGM =====
-    // Dùng AudioManager để phát nhạc nền (nếu có key trong SOUND_MAP)
-    // Không cần lưu bgm vào this.bgm nữa vì AudioManager quản lý
-
-    this.input.once("pointerdown", () => {
-  // 1. Bật nhạc nền (loop xuyên suốt)
-  AudioManager.play("bgm_main");
-
-  // 2. Chờ một chút rồi phát voice_intro
-  this.time.delayedCall(10, () => {
-    if (this.level === 0) {
-  AudioManager.play("voice_intro");
-}
-
-  });
+// ===== BGM =====
+// ===== INTRO (chỉ đọc 1 lần) =====
+this.input.once("pointerdown", () => {
+  ensureBgmStarted();
+  if (this.level === 0 && !hasIntroPlayed()) {
+    const id = AudioManager.play("voice_intro");
+    if (id !== undefined) {
+      markIntroPlayed();
+    }
+  }
 });
 
 
@@ -392,7 +388,7 @@ export default class GameScene extends Phaser.Scene {
 
     const baseCharScale = height / 720;
     scaleChar = baseCharScale * 0.55;
-    charX = width * 0.17;
+    charX = width * 0.14;
 
         if (this.textures.exists(level.character)) {
           const charImg = this.add
@@ -617,7 +613,7 @@ export default class GameScene extends Phaser.Scene {
           iconScale *= 0.85;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
         }
         if (item.asset === "bowl") {
-          iconScale *= 0.85;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
+          iconScale *= 0.75;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
         }
         if (item.asset === "lamp") {
           iconScale *= 0.88;       // tăng 25%, thích thì chỉnh 1.2 / 1.3
