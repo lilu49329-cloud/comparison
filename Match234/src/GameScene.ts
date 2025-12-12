@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import { preloadGameAssets, BUTTON_ASSET_URLS } from "./assetLoader";
 import AudioManager from "./AudioManager";
+import { hasIntroPlayed, markIntroPlayed } from "./rotateOrientation";
+import { ensureBgmStarted } from "./main";
 
 // ========== TYPES ==========
 interface CardData {
@@ -328,21 +330,16 @@ export default class GameScene extends Phaser.Scene {
 
     
 
-    // ===== BGM =====
-    // Dùng AudioManager để phát nhạc nền (nếu có key trong SOUND_MAP)
-    // Không cần lưu bgm vào this.bgm nữa vì AudioManager quản lý
-
-    this.input.once("pointerdown", () => {
-  // 1. Bật nhạc nền (loop xuyên suốt)
-  AudioManager.play("bgm_main");
-
-  // 2. Chờ một chút rồi phát voice_intro
-  this.time.delayedCall(10, () => {
-    if (this.level === 0) {
-  AudioManager.play("voice_intro");
-}
-
-  });
+// ===== BGM =====
+// ===== INTRO (chỉ đọc 1 lần) =====
+this.input.once("pointerdown", () => {
+  ensureBgmStarted();
+  if (this.level === 0 && !hasIntroPlayed()) {
+    const id = AudioManager.play("voice_intro");
+    if (id !== undefined) {
+      markIntroPlayed();
+    }
+  }
 });
 
 
