@@ -715,6 +715,12 @@ this.input.once("pointerdown", () => {
     this.numbers.forEach((numCard, idx) => {
       numCard.on("pointerdown", () => {
         if (this.matches[idx]) return;
+        // Nếu voice_intro vẫn đang phát mà user bắt đầu nối,
+        // dừng toàn bộ audio rồi bật lại BGM để tránh chồng tiếng.
+        if (AudioManager.isPlaying("voice_intro")) {
+          AudioManager.stopAll();
+          ensureBgmStarted();
+        }
 
         this.isDragging = true;
         this.dragStartIdx = idx;
