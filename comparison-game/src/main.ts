@@ -1,10 +1,11 @@
 import Phaser from "phaser";
-import PreloadScene from "./PreloadScene";
+//import OverlayScene from "./OverlayScene";
 import GameScene from "./GameScene";
-import BalanceScene from "./BalanceScene";
 import EndGameScene from "./EndGameScene";
 import AudioManager from "./AudioManager";
-import { initRotateOrientation, playVoiceLocked } from "./rotateOrientation";
+import { initRotateOrientation } from "./rotateOrientation";
+import PreloadScene from "./PreloadScene";
+import BalanceScene from "./BalanceScene";
 
 
 // ================== TẠO CONTAINER GAME ==================
@@ -120,18 +121,28 @@ if (container instanceof HTMLDivElement) {
 // Giữ tham chiếu game để tránh tạo nhiều lần (HMR, reload…)
 let game: Phaser.Game | null = null;
 // ========== GLOBAL BGM (CHẠY XUYÊN SUỐT GAME) ==========
-let bgmStarted = false;
+// ========== GLOBAL BGM (CHẠY XUYÊN SUỐT GAME) ==========
 
-function setupGlobalBgm() {
-  const startBgm = () => {
-    if (bgmStarted) return;
-    bgmStarted = true;
+export function ensureBgmStarted() {
+  console.log("[BGM] ensure play bgm_main");
+  // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
+  if (!AudioManager.isPlaying("bgm_main")) {
     AudioManager.play("bgm_main");
-    window.removeEventListener("pointerdown", startBgm);
-  };
-
-  window.addEventListener("pointerdown", startBgm);
+  }
 }
+
+
+
+// function setupGlobalBgm() {
+//   const startBgm = () => {
+//     ensureBgmStarted();
+//   };
+
+//   ["pointerdown", "touchstart", "mousedown"].forEach((ev) => {
+//     document.addEventListener(ev, startBgm, { once: true });
+//   });
+// }
+
 
 // Cố gắng resume AudioContext khi overlay bật/tắt
 function resumeSoundContext(scene: Phaser.Scene) {
@@ -147,7 +158,6 @@ function resumeSoundContext(scene: Phaser.Scene) {
   setRandomGameViewportBg,
   setRandomEndViewportBg,
   setGameButtonsVisible,
-  playVoiceLocked,
 }));
 
 // ================== CẤU HÌNH PHASER ==================
@@ -165,8 +175,8 @@ const config: Phaser.Types.Core.GameConfig = {
     pixelArt: false,
     antialias: true,
   },
-  // Chạy PreloadScene trước, rồi GameScene, BalanceScene (màn phụ), EndGameScene
-  scene: [PreloadScene, GameScene, BalanceScene, EndGameScene],
+  // Chạy PreloadScene trước để load toàn bộ asset, rồi mới vào GameScene
+  scene: [PreloadScene, GameScene,BalanceScene, EndGameScene],
 };
 
 // ================== KẾT NỐI NÚT HTML (ngoài Phaser) ==================
@@ -230,7 +240,7 @@ async function initGame() {
   }
 
   // Bật nhạc nền 1 lần, loop xuyên suốt game (sau user gesture)
-  setupGlobalBgm();
+  // setupGlobalBgm();
 
   if (!game) {
     // setRandomIntroViewportBg();

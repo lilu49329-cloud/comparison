@@ -7,10 +7,12 @@ interface SoundConfig {
     src: string;
     loop?: boolean;
     volume?: number;
+    html5?: boolean; // thêm dòng này
 }
 
-// 2. Đường dẫn gốc (Đảm bảo đường dẫn này đúng trong public folder của Vite)
-const BASE_PATH = '/assets/audio/'; // Sử dụng '/' cho Vite public folder
+// 2. Đường dẫn gốc tới thư mục audio (tương đối so với index.html trong dist)
+// Dùng 'assets/...' thay vì '/assets/...' để khi nhúng game vào sub-folder vẫn load đúng.
+const BASE_PATH = 'assets/audio/';
 
 // 3. Ánh xạ ID âm thanh (key) và cấu hình chi tiết
 const SOUND_MAP: Record<string, SoundConfig> = {
@@ -43,11 +45,11 @@ const SOUND_MAP: Record<string, SoundConfig> = {
         src: `${BASE_PATH}bgm_main.mp3`,
         loop: true,
         volume: 0.5, // tuỳ bạn, có thể giữ 1.0
+        html5: false,
         },
-
+        
     "complete": { src: `${BASE_PATH}vic_sound.mp3` },
-    "voice_end": { src: `${BASE_PATH}voice_end.mp3` },
-
+    "voice_intro": { src: `${BASE_PATH}voice_intro.mp3` },
     // ... Thêm các cặp còn lại vào SOUND_MAP ...
     "voice_need_finish": { src: `${BASE_PATH}voice_need_finish.mp3` },
 
@@ -55,14 +57,16 @@ const SOUND_MAP: Record<string, SoundConfig> = {
     "fireworks": { src: `${BASE_PATH}fireworks.mp3`, volume: 1.0 },
     "applause": { src: `${BASE_PATH}applause.mp3`, volume: 1.0 },
 
-    // ---- Các file audio bổ sung trong public/assets/audio ----
-    "finish": { src: `${BASE_PATH}finish.mp3`, volume: 1.0 },
+    // ==== Voice câu hỏi cho Comparison Game ====
+    // Hướng dẫn kéo bóng / hoa (màn phụ BalanceScene)
     "keo_bong": { src: `${BASE_PATH}keo_bong.mp3`, volume: 1.0 },
     "keo_hoa": { src: `${BASE_PATH}keo_hoa.mp3`, volume: 1.0 },
-    "less_b": { src: `${BASE_PATH}less_b.mp3`, volume: 1.0 },
-    "less_f": { src: `${BASE_PATH}less_f.mp3`, volume: 1.0 },
+    // Bóng bay (BALLOON)
     "more_b": { src: `${BASE_PATH}more_b.mp3`, volume: 1.0 },
+    "less_b": { src: `${BASE_PATH}less_b.mp3`, volume: 1.0 },
+    // Bó hoa (FLOWER)
     "more_f": { src: `${BASE_PATH}more_f.mp3`, volume: 1.0 },
+    "less_f": { src: `${BASE_PATH}less_f.mp3`, volume: 1.0 },
 };
 
 class AudioManager {
@@ -70,10 +74,12 @@ class AudioManager {
     private sounds: Record<string, Howl> = {};
     private isLoaded: boolean = false;
 
+    
     constructor() {
         // Cấu hình quan trọng cho iOS
         Howler.autoUnlock = true;
         Howler.volume(1.0);
+        (Howler as any).html5PoolSize = 100;
     }
 
     /**
@@ -93,9 +99,10 @@ class AudioManager {
 
                 this.sounds[key] = new Howl({
                     src: [config.src],
-                    loop: config.loop || false,
-                    volume: config.volume || 1.0,
-                    html5: true, // Cần thiết cho iOS
+                    loop: config.loop ?? false,
+                    volume: config.volume ?? 1.0,
+                    // Mặc định dùng WebAudio; chỉ bật html5 nếu cấu hình riêng
+                    html5: config.html5 ?? false,
 
                     onload: () => {
                         loadedCount++;
@@ -131,7 +138,9 @@ class AudioManager {
      * @param {string} id - ID âm thanh
      * @returns {number | undefined} - Sound ID của Howler
      */
-    play(id: string): number | undefined {
+   // src/AudioManager.ts
+
+play(id: string): number | undefined {
   if (!this.isLoaded || !this.sounds[id]) {
     console.warn(
       `[AudioManager] Sound ID not found or not loaded: ${id}`
@@ -139,16 +148,15 @@ class AudioManager {
     return;
   }
 
-  // Không cho BGM phát lại nếu nó đang chạy
-  if (id === "bgm_main") {
-    const bgm = this.sounds[id];
-    if (bgm.playing()) {
-      return; // đã phát rồi -> không restart nữa
-    }
-  }
-
+  // Bỏ hoàn toàn phần if (id === "bgm_main") ...
   return this.sounds[id].play();
 }
+
+isPlaying(id: string): boolean {
+  const sound = this.sounds[id];
+  return !!sound && sound.playing();
+}
+
 
 
     /**

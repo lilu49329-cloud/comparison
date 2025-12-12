@@ -1,7 +1,7 @@
 // src/rotateOrientation.ts
 import Phaser from 'phaser';
 import audioManager from './AudioManager';
-
+import { ensureBgmStarted } from "./main";
 // ================== STATE CHUNG ==================
 let rotateOverlay: HTMLDivElement | null = null;
 let isRotateOverlayActive = false;
@@ -13,6 +13,17 @@ let globalBlockListenersAttached = false;
 // chống spam voice-rotate
 let lastRotateVoiceTime = 0;
 const ROTATE_VOICE_COOLDOWN = 1500; // ms – 1.5s
+
+// Intro chỉ phát 1 lần cho cả game
+let introPlayedOnce = false;
+
+export function hasIntroPlayed(): boolean {
+    return introPlayedOnce;
+}
+
+export function markIntroPlayed(): void {
+    introPlayedOnce = true;
+}
 
 // ================== CẤU HÌNH CỐ ĐỊNH (DÙNG CHUNG) ==================
 type RotateConfig = {
@@ -41,6 +52,12 @@ function getVoicePriority(key: string): number {
         return 4;
     }
     return 1;
+}
+
+// Cho màn phụ (BalanceScene) reset trạng thái ưu tiên/khóa voice
+export function resetRotateVoiceLock(): void {
+    currentVoiceKey = null;
+    lastRotateVoiceTime = 0;
 }
 
 /**
@@ -108,11 +125,6 @@ export function playVoiceLocked(
     currentVoiceKey = key;
 }
 
-// Cho phép scene reset trạng thái khóa voice (ví dụ khi vào màn mới)
-export function resetRotateVoiceLock(): void {
-    currentVoiceKey = null;
-}
-
 // ================== BLOCK & REPLAY KHI OVERLAY BẬT ==================
 function attachGlobalBlockInputListeners() {
     if (globalBlockListenersAttached) return;
@@ -129,7 +141,9 @@ function attachGlobalBlockInputListeners() {
         }
         ev.preventDefault();
 
-        // 2) Gọi phát voice-rotate (đã có cooldown bên trong playVoiceLocked)
+         // 2) LẦN ĐẦU bé chạm overlay -> bật BGM ở đây (gesture iOS cho phép)
+        ensureBgmStarted();
+        // 3) Gọi phát voice-rotate (đã có cooldown bên trong playVoiceLocked)
         try {
             playVoiceLocked(null as any, 'voice_rotate');
         } catch (err) {
@@ -229,7 +243,6 @@ function updateRotateHint() {
     if (overlayTurnedOn) {
         try {
             // Khi đang ở màn dọc: chỉ phát voice_rotate, tạm dừng nhạc/intro nếu có
-            audioManager.stop('bgm_main');
             audioManager.stop('voice_intro');
 
             playVoiceLocked(null as any, 'voice_rotate');
@@ -245,20 +258,17 @@ function updateRotateHint() {
             currentVoiceKey = null;
         }
 
-        try {
-            audioManager.play('bgm_main');
-
-            // Khi xoay ngang lại: cố gắng phát lại câu hỏi hiện tại (nếu GameScene đã đăng ký)
-            const playQuestion =
-                (window as any).playCurrentQuestionVoice as
-                    | (() => void)
-                    | undefined;
-            if (typeof playQuestion === 'function') {
-                playQuestion();
-            }
-        } catch (e) {
-            console.warn('[Rotate] auto resume bgm/intro error:', e);
-        }
+        // // Khi xoay ngang lại: bật lại BGM và intro (intro chỉ đọc 1 lần)
+        // try {
+        //     if (!introPlayedOnce) {
+        //         const id = audioManager.play('voice_intro');
+        //         if (id !== undefined) {
+        //             introPlayedOnce = true;
+        //         }
+        //     }
+        // } catch (e) {
+        //     console.warn('[Rotate] auto resume bgm/intro error:', e);
+        // }
     }
 }
 
@@ -274,6 +284,9 @@ export function initRotateOrientation(_game: Phaser.Game) {
     ensureRotateOverlay();
     attachGlobalBlockInputListeners(); // chặn + replay khi overlay bật
     updateRotateHint();
+
+    // Cho các scene khác (GameScene, BalanceScene, ...) gọi thống nhất
+    (window as any).playVoiceLocked = playVoiceLocked;
 
     window.addEventListener('resize', updateRotateHint);
     window.addEventListener(

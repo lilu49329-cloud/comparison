@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import AudioManager from './AudioManager';
 
 export default class BaseScene extends Phaser.Scene {
   constructor(key: string) {
@@ -38,7 +39,7 @@ export default class BaseScene extends Phaser.Scene {
 
     btn.on('pointerdown', () => {
       btn.setTexture('btn_primary_pressed');
-      (window as any).playVoiceLocked(this.sound, 'sfx_click');
+      AudioManager.play('sfx_click');
     });
 
     btn.on('pointerup', () => {

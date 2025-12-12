@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type GameScene from './GameScene';
-import { resetRotateVoiceLock } from './rotateOrientation';
+import { resetRotateVoiceLock, playVoiceLocked } from './rotateOrientation';
 
 type Subject = 'BALLOON' | 'FLOWER';
 
@@ -416,6 +416,6 @@ export default class BalanceScene extends Phaser.Scene {
     // Voice hướng dẫn kéo bóng/hoa – dùng key audio trong AudioManager
     const dragKey =
       this.subject === 'BALLOON' ? 'keo_bong' : 'keo_hoa';
-    (window as any).playVoiceLocked(this.sound, dragKey);
+    playVoiceLocked(this.sound, dragKey);
   }
 }

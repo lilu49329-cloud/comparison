@@ -160,6 +160,22 @@ export default class GameScene extends Phaser.Scene {
     if ((window as any).setRandomGameViewportBg) {
       (window as any).setRandomGameViewportBg();
     }
+    // Phát voice câu hỏi:
+    // - Lần đầu: chờ 1 user gesture để unlock audio
+    // - Các màn sau: phát tự động ngay trong create()
+    const audioUnlockedKey = '__questionAudioUnlocked__';
+    const audioUnlocked = !!(window as any)[audioUnlockedKey];
+
+    if (audioUnlocked) {
+      // Đã có gesture trước đó → phát luôn
+      this.playCurrentQuestionVoice();
+    } else {
+      // Gắn 1 listener duy nhất để unlock audio + phát câu hỏi đầu tiên
+      this.input.once('pointerdown', () => {
+        (window as any)[audioUnlockedKey] = true;
+        this.playCurrentQuestionVoice();
+      });
+    }
 
     // Gắn asset cho nút HTML trên viewport
     const replayBtnEl = document.getElementById('btn-replay') as
@@ -412,9 +428,6 @@ export default class GameScene extends Phaser.Scene {
     const scaleX = desiredWidth / baseBannerWidth;
     const scaleY = BANNER_SCALE * BOARD_SCALE;
     this.questionBanner.setScale(scaleX, scaleY);
-
-    // Phát voice đọc câu hỏi (dùng AudioManager)
-    this.playCurrentQuestionVoice();
 
     this.girlSprite.setTexture(GIRL_TEXTURE[subject]);
     this.boySprite.setTexture(BOY_TEXTURE[subject]);
