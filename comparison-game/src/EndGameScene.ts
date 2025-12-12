@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import AudioManager from "./AudioManager";
+import { ensureBgmStarted } from "./main";
 
 function hideGameButtons() {
   (window as any).setGameButtonsVisible?.(false);
@@ -102,6 +103,8 @@ export default class EndGameScene extends Phaser.Scene {
                 lessonId: this.lessonId,
                 difficulty: this.difficulty,
             });
+            // Bật lại BGM sau khi chơi lại
+            ensureBgmStarted();
         });
 
         const exitBtn = this.add

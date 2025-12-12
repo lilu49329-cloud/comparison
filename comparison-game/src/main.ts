@@ -197,6 +197,7 @@ function setupHtmlButtons() {
 
         game.scene.stop("BalanceScene");
         game.scene.start("GameScene", { levelIndex, score });
+        ensureBgmStarted();
         return;
       }
 
@@ -207,6 +208,7 @@ function setupHtmlButtons() {
         levelIndex: scene.levelIndex,
         score: scene.score,
       });
+      ensureBgmStarted();
     });
   }
 
