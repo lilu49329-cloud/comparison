@@ -7,6 +7,7 @@ interface SoundConfig {
     src: string;
     loop?: boolean;
     volume?: number;
+    html5?: boolean; // thêm dòng này
 }
 
 // 2. Đường dẫn gốc tới thư mục audio (tương đối so với index.html trong dist)
@@ -44,6 +45,7 @@ const SOUND_MAP: Record<string, SoundConfig> = {
         src: `${BASE_PATH}bgm_main.mp3`,
         loop: true,
         volume: 0.5, // tuỳ bạn, có thể giữ 1.0
+        html5: false,
         },
         
     "complete": { src: `${BASE_PATH}vic_sound.mp3` },
