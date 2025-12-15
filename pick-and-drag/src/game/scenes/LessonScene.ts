@@ -16,7 +16,10 @@ type AnswerLog = {
     timestamp: number;
 };
 
+
 export class LessonScene extends Phaser.Scene {
+    private userInteracted = false;
+
     private lesson!: LessonPackage;
     private index = 0;
     private score = 0;
@@ -75,16 +78,6 @@ export class LessonScene extends Phaser.Scene {
     }
 
     create() {
-        this.input.once('pointerdown', () => {
-        if (!window.phaserBgm || !window.phaserBgm.isPlaying) {
-            const bgm = this.sound.add('bgm_main', {
-            loop: true,
-            volume: 0.4,
-            });
-            bgm.play();
-            window.phaserBgm = bgm;
-        }
-        });
 
         // Cho phép html-button gọi vào lessonScene qua global
         (window as any).lessonScene = this;
@@ -128,10 +121,44 @@ export class LessonScene extends Phaser.Scene {
 
         this.promptImage = undefined;
 
+        // ===== TAP TO START (BẮT BUỘC) =====
+        const tapBlocker = this.add
+        .rectangle(
+            GAME_WIDTH / 2,
+            GAME_HEIGHT / 2,
+            GAME_WIDTH,
+            GAME_HEIGHT,
+            0x000000,
+            0.001 // gần như trong suốt
+        )
+        .setDepth(999)
+        .setInteractive();
 
+
+        // this.showQuestion();
+        // this.setupPromptReplay();
+        tapBlocker.once('pointerdown', () => {
+        this.userInteracted = true; // 🔥 DUY NHẤT Ở ĐÂY
+        tapBlocker.destroy();
+
+        // 🔊 đọc câu hỏi đầu tiên
+        this.playCurrentPrompt();
+
+        // 🎵 bật BGM (Phaser)
+        if (!window.phaserBgm || !window.phaserBgm.isPlaying) {
+            const bgm = this.sound.add('bgm_main', {
+            loop: true,
+            volume: 0.4,
+            });
+            bgm.play();
+            window.phaserBgm = bgm;
+        }
+
+        // ⏱ bật cơ chế đọc lại nếu bé không thao tác
+        this.setupPromptReplay();
+        });
 
         this.showQuestion();
-        this.setupPromptReplay();
 
         // Lắng nghe xoay màn hình để đọc lại câu hỏi khi xoay ngang
         window.addEventListener(
@@ -353,17 +380,20 @@ export class LessonScene extends Phaser.Scene {
     }
 
 
-    private playCurrentPrompt() {
-        const item = this.lesson.items[this.index];
-        if (!item) return;
+private playCurrentPrompt() {
+    if (!this.userInteracted) return; // 🔥 CHỐT HẠ CUỐI CÙNG
 
-        const audioKey =
-            item.promptAudio || this.lesson.defaultPromptAudio || null;
-        if (!audioKey) return;
+    const item = this.lesson.items[this.index];
+    if (!item) return;
 
-        this.currentPromptAudioKey = audioKey;
-        AudioManager.playOneShot(audioKey, 1.0);
-    }
+    const audioKey =
+        item.promptAudio || this.lesson.defaultPromptAudio || null;
+    if (!audioKey) return;
+
+    this.currentPromptAudioKey = audioKey;
+    AudioManager.playOneShot(audioKey, 1.0);
+}
+
 
     // Sắp xếp lại 2 lựa chọn để ĐÁP ÁN ĐÚNG
     // luân phiên nằm bên trái / bên phải qua từng câu,
@@ -823,28 +853,32 @@ export class LessonScene extends Phaser.Scene {
      * - Đọc câu hỏi ngay.
      * - Sau 10s, nếu vẫn chưa chơi tiếp, đọc lại 1 lần nữa.
      */
-    private setupPromptReplay() {
-        this.clearPromptReplayTimer();
+private setupPromptReplay() {
+    if (!this.userInteracted) return; // 🔥 CHỐT HẠ
 
-        if (window.innerWidth < window.innerHeight) {
-            return;
-        }
+    this.clearPromptReplayTimer();
 
-        this.playCurrentPrompt();
-
-        if (!this.currentPromptAudioKey) return;
-
-        this.audioReplayTimer = this.time.addEvent({
-            delay: 10000,
-            loop: false,
-            callback: () => {
-                if (
-                    window.innerWidth >= window.innerHeight &&
-                    this.currentPromptAudioKey
-                ) {
-                    this.playCurrentPrompt();
-                }
-            },
-        });
+    if (window.innerWidth < window.innerHeight) {
+        return;
     }
+
+    this.playCurrentPrompt();
+
+    if (!this.currentPromptAudioKey) return;
+
+    this.audioReplayTimer = this.time.addEvent({
+        delay: 10000,
+        loop: false,
+        callback: () => {
+            if (
+                this.userInteracted &&
+                window.innerWidth >= window.innerHeight &&
+                this.currentPromptAudioKey
+            ) {
+                this.playCurrentPrompt();
+            }
+        },
+    });
+}
+
 }
