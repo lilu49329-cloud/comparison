@@ -2,11 +2,6 @@
 import Phaser from 'phaser';
 import AudioManager from './audio/AudioManager';
 
-// ================== STATE CHUNG ==================
-let gameRef: Phaser.Game | null = null;
-let mainSceneKey = 'LessonSelectScene';
-let overlaySceneKey: string | null = 'OverlayScene';
-
 let rotateOverlay: HTMLDivElement | null = null;
 let isRotateOverlayActive = false;
 
@@ -89,11 +84,10 @@ export function initRotateOrientation(
         overlaySceneKey?: string | null;
     }
 ) {
-    gameRef = game;
-    if (options?.mainSceneKey) mainSceneKey = options.mainSceneKey;
-    if (options && 'overlaySceneKey' in options) {
-        overlaySceneKey = options.overlaySceneKey ?? null;
-    }
+    // Hiện tại không cần tham chiếu trực tiếp tới game/options,
+    // nhưng vẫn giữ tham số để API tương thích.
+    void game;
+    void options;
 
     ensureRotateOverlay();
     updateRotateHint();
