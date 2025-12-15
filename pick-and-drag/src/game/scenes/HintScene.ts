@@ -480,18 +480,25 @@ export class HintScene extends Phaser.Scene {
             return;
         }
 
+        // Tăng volume riêng cho voice câu hỏi trong Hint
+        const volume =
+            audioKey.startsWith('audio/size/') ||
+            audioKey.includes('/size_')
+                ? 1.4
+                : 1.0;
+
         const hasInCache =
             !!this.cache.audio && this.cache.audio.exists(audioKey);
         const existingSound = this.sound.get(audioKey);
 
         if (hasInCache || existingSound) {
-            this.sound.play(audioKey);
+            this.sound.play(audioKey, { volume });
             return;
         }
 
         this.load.audio(audioKey, audioKey);
         this.load.once(Phaser.Loader.Events.COMPLETE, () => {
-            this.sound.play(audioKey);
+            this.sound.play(audioKey, { volume });
         });
         this.load.start();
     }
