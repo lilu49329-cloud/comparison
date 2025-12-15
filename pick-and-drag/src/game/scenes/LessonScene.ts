@@ -36,23 +36,22 @@ export class LessonScene extends Phaser.Scene {
 
     private optionImages: Phaser.GameObjects.Image[] = [];
     private optionPanels: Phaser.GameObjects.Image[] = [];
+    
 
     // Lưu lại lần trước ĐÁP ÁN ĐÚNG nằm bên nào (trái/phải) cho bài 2 lựa chọn
     private lastBinaryCorrectSide: 'left' | 'right' | null = null;
 
     private lockInput = false;
-    private currentPromptAudioKey: string | null = null;
-    private audioReplayTimer?: Phaser.Time.TimerEvent;
 
-    private handleOrientationChange = () => {
-        // Khi xoay về ngang (landscape), thiết lập lại cơ chế đọc câu hỏi
-        if (window.innerWidth > window.innerHeight) {
-            this.setupPromptReplay();
-        } else {
-            // Đang ở dọc: không auto đọc lại
-            this.clearPromptReplayTimer();
-        }
-    };
+    // private handleOrientationChange = () => {
+    //     // Khi xoay về ngang (landscape), thiết lập lại cơ chế đọc câu hỏi
+    //     if (window.innerWidth > window.innerHeight) {
+    //         this.setupPromptReplay();
+    //     } else {
+    //         // Đang ở dọc: không auto đọc lại
+    //         this.clearPromptReplayTimer();
+    //     }
+    // };
 
     private answerLogs: AnswerLog[] = [];
 
@@ -68,7 +67,6 @@ export class LessonScene extends Phaser.Scene {
         this.score = 0;
         this.answerLogs = [];
         this.lockInput = false;
-        this.currentPromptAudioKey = null;
 
         // nếu muốn chắc ăn, clear luôn mảng option (chỉ để an toàn)
         this.optionImages.forEach((img) => img.destroy());
@@ -137,40 +135,41 @@ export class LessonScene extends Phaser.Scene {
 
         // this.showQuestion();
         // this.setupPromptReplay();
-        tapBlocker.once('pointerdown', () => {
-        this.userInteracted = true; // 🔥 DUY NHẤT Ở ĐÂY
-        tapBlocker.destroy();
+       // 1) VẼ UI + CÂU HỎI NGAY
+this.showQuestion();
 
-        // 🔊 đọc câu hỏi đầu tiên
-        this.playCurrentPrompt();
+// 2) Overlay chỉ unlock audio
+    tapBlocker.once('pointerdown', () => {
+    this.userInteracted = true;
+    tapBlocker.destroy();
 
-        // 🎵 bật BGM (Phaser)
-        if (!window.phaserBgm || !window.phaserBgm.isPlaying) {
-            const bgm = this.sound.add('bgm_main', {
-            loop: true,
-            volume: 0.4,
-            });
-            bgm.play();
-            window.phaserBgm = bgm;
-        }
+    // chỉ phát âm + bgm sau khi user chạm
+    this.playCurrentPrompt();
 
-        // ⏱ bật cơ chế đọc lại nếu bé không thao tác
-        this.setupPromptReplay();
-        });
+    const bgm = this.sound.add('bgm_main', { loop: true, volume: 0.4 });
+    bgm.play();
+    });
 
-        this.showQuestion();
+    // });
+
+
+        // // ⏱ bật cơ chế đọc lại nếu bé không thao tác
+        // this.setupPromptReplay();
+        // });
+
+        // this.showQuestion();
 
         // Lắng nghe xoay màn hình để đọc lại câu hỏi khi xoay ngang
-        window.addEventListener(
-            'orientationchange',
-            this.handleOrientationChange
-        );
-        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-            window.removeEventListener(
-                'orientationchange',
-                this.handleOrientationChange
-            );
-        });
+        // // /window.addEventListener(
+        //     'orientationchange',
+        //     // this.handleOrientationChange
+        // );
+        // this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        //     // window.removeEventListener(
+        //         'orientationchange',
+        //         // this.handleOrientationChange
+        //     );
+        // });
 
         // Nhân vật đồng hành random: boy hoặc squirrel
         const characterKeys = ['char'];
@@ -300,9 +299,8 @@ export class LessonScene extends Phaser.Scene {
     }
 
 
-    const promptAudio =
-        item.promptAudio || this.lesson.defaultPromptAudio || null;
-    this.currentPromptAudioKey = promptAudio;
+    // const promptAudio =
+    //     item.promptAudio || this.lesson.defaultPromptAudio || null;
 
     this.optionImages.forEach((img) => img.destroy());
     this.optionPanels.forEach((p) => p.destroy());
@@ -390,7 +388,6 @@ private playCurrentPrompt() {
         item.promptAudio || this.lesson.defaultPromptAudio || null;
     if (!audioKey) return;
 
-    this.currentPromptAudioKey = audioKey;
     AudioManager.playOneShot(audioKey, 1.0);
 }
 
@@ -683,7 +680,6 @@ private playCurrentPrompt() {
         this.stopAllExceptBgm();
 
         // 🔥 bé đã chọn -> huỷ timer đọc lại câu hỏi
-        this.clearPromptReplayTimer();
 
         const isCorrect = optId === item.correctOptionId;
 
@@ -764,16 +760,20 @@ private playCurrentPrompt() {
     }
 
     private nextQuestion() {
-        this.index++;
-        // Đổi background DOM mỗi khi sang câu mới
-        domBackgroundManager.setBackground();
-        this.showQuestion();
-        this.setupPromptReplay();
+    this.index++;
+    domBackgroundManager.setBackground();
+    this.showQuestion();
+
+    // Nếu muốn: tự đọc câu hỏi ở câu tiếp theo
+    // chỉ khi user đã từng chạm (đã unlock)
+    if (this.userInteracted) {
+        this.playCurrentPrompt();
     }
+    }
+
 
     private endLesson() {
         console.log('Answer logs:', this.answerLogs);
-        this.clearPromptReplayTimer();
 
         this.scene.start('SummaryScene', {
             score: this.score,
@@ -808,7 +808,6 @@ private playCurrentPrompt() {
         // vẽ lại câu đầu tiên
         domBackgroundManager.setBackground();
         this.showQuestion();
-        this.setupPromptReplay();
     }
 
     public goToNextLevel() {
@@ -839,46 +838,20 @@ private playCurrentPrompt() {
         this.nextQuestion();
     }
 
-    // ===== CƠ CHẾ ĐỌC LẠI CÂU HỎI KHI BÉ KHÔNG THAO TÁC =====
+    // // ===== CƠ CHẾ ĐỌC LẠI CÂU HỎI KHI BÉ KHÔNG THAO TÁC =====
+    // private setupAutoReadPrompt() {
+    //     if (this.lesson?.items && this.lesson.items.length > 0) {
+    //         const item = this.lesson.items[this.index];
+    //         if (item && item.promptAudio) {
+    //             // Đọc lại câu hỏi sau 10 giây nếu chưa có hành động
+    //             this.time.delayedCall(10000, () => {
+    //                 if (!this.userInteracted) {
+    //                     this.playCurrentPrompt();
+    //                 }
+    //             });
+    //         }
+    //     }
+    // }
 
-    private clearPromptReplayTimer() {
-        if (this.audioReplayTimer) {
-            this.audioReplayTimer.remove(false);
-            this.audioReplayTimer = undefined;
-        }
-    }
-
-    /**
-     * Nếu đang ở màn ngang:
-     * - Đọc câu hỏi ngay.
-     * - Sau 10s, nếu vẫn chưa chơi tiếp, đọc lại 1 lần nữa.
-     */
-private setupPromptReplay() {
-    if (!this.userInteracted) return; // 🔥 CHỐT HẠ
-
-    this.clearPromptReplayTimer();
-
-    if (window.innerWidth < window.innerHeight) {
-        return;
-    }
-
-    this.playCurrentPrompt();
-
-    if (!this.currentPromptAudioKey) return;
-
-    this.audioReplayTimer = this.time.addEvent({
-        delay: 10000,
-        loop: false,
-        callback: () => {
-            if (
-                this.userInteracted &&
-                window.innerWidth >= window.innerHeight &&
-                this.currentPromptAudioKey
-            ) {
-                this.playCurrentPrompt();
-            }
-        },
-    });
-}
 
 }

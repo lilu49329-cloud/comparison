@@ -4,13 +4,6 @@
 
     const DEFAULT_LESSON_ID = 'size_basic_01';
     const MAX_QUESTIONS = 5;
-    const FIRST_VOICE_FALLBACK_MS = 1400;
-
-    declare global {
-    interface Window {
-        phaserBgm?: Phaser.Sound.BaseSound;
-    }
-    }
 
     export class PreloadScene extends Phaser.Scene {
     private lessonData!: LessonPackage;
@@ -55,21 +48,21 @@
         }
         this.load.json('lessonData', `lessons/${DEFAULT_LESSON_ID}.json`);
 
-        // ===== BGM (PHASER) =====
+        // ===== AUDIO FILE (CHỈ LOAD – KHÔNG PLAY) =====
         this.load.audio('bgm_main', 'audio/sfx/bgm_main.mp3');
     }
 
     async create() {
         const rawLesson = this.cache.json.get('lessonData') as LessonPackage;
 
-        // 1️⃣ chỉ giữ câu 2 lựa chọn
+        // 1️⃣ chỉ giữ câu 2 lựa chọn (fallback nếu không có)
         let items = rawLesson.items.filter((it) => it.options.length === 2);
         if (items.length === 0) items = rawLesson.items.slice();
 
-        // 2️⃣ shuffle + cắt max
+        // 2️⃣ shuffle + cắt số câu
         items = Phaser.Utils.Array.Shuffle(items.slice()).slice(0, MAX_QUESTIONS);
 
-        // 3️⃣ shuffle options
+        // 3️⃣ shuffle options trong từng câu
         const randomizedItems = items.map((item) => ({
         ...item,
         options:
@@ -84,28 +77,24 @@
         };
 
         try {
-        // 4️⃣ load audio Howler + ảnh động
+        // 4️⃣ load toàn bộ audio Howler (voice, sfx…) – CHỈ LOAD
         await AudioManager.loadAll();
+
+        // 5️⃣ load ảnh động theo lesson
         await this.preloadDynamicAssets(lessonForPlay);
 
-        // 5️⃣ PRELOAD VOICE CÂU 1 (QUAN TRỌNG)
-        await this.preloadFirstPromptVoice(lessonForPlay);
-
+        // ❗❗ TUYỆT ĐỐI KHÔNG PLAY ÂM THANH Ở ĐÂY ❗❗
         this.lessonData = lessonForPlay;
 
-        // 6️⃣ vẽ LessonScene trước
+        // 6️⃣ sang LessonScene
         this.scene.start('LessonScene', { lesson: this.lessonData });
-
-        // 7️⃣ voice câu 1 → xong mới bật BGM
-        this.playFirstPromptThenBgm();
         } catch (e) {
-        console.error('Preload error:', e);
+        console.error('PreloadScene error:', e);
         this.scene.start('LessonScene', { lesson: lessonForPlay });
-        this.safeStartBgm();
         }
     }
 
-    // ===== LOAD ẢNH ĐỘNG =====
+    // ===== LOAD ẢNH ĐỘNG THEO LESSON =====
     private preloadDynamicAssets(lesson: LessonPackage) {
         lesson.items.forEach((item: any) => {
         if (item.promptImage && !this.textures.exists(item.promptImage)) {
@@ -133,76 +122,5 @@
         this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
         this.load.start();
         });
-    }
-
-    // ===== PRELOAD VOICE CÂU 1 =====
-    private preloadFirstPromptVoice(lesson: LessonPackage): Promise<void> {
-        const firstItem = lesson.items?.[0];
-        const voice =
-        firstItem?.promptAudio || lesson.defaultPromptAudio || null;
-
-        if (!voice) return Promise.resolve();
-
-        return new Promise<void>((resolve) => {
-        const anyAM: any = AudioManager;
-
-        if (anyAM.dynamicSounds?.[voice]) {
-            resolve();
-            return;
-        }
-
-        const howl = new (window as any).Howl({
-            src: [voice],
-            html5: true,
-            preload: true,
-            onload: () => resolve(),
-            onloaderror: () => resolve(),
-        });
-
-        anyAM.dynamicSounds ??= {};
-        anyAM.dynamicSounds[voice] = howl;
-        });
-    }
-
-    // ===== VOICE → BGM =====
-    private playFirstPromptThenBgm() {
-        const firstItem = this.lessonData.items?.[0];
-        const firstVoice =
-        firstItem?.promptAudio || this.lessonData.defaultPromptAudio || null;
-
-        if (!firstVoice) {
-        this.safeStartBgm();
-        return;
-        }
-
-        const handle: any = AudioManager.playOneShot(firstVoice, 1.0);
-
-        if (handle && typeof handle.once === 'function') {
-        handle.once('end', () => this.safeStartBgm());
-        } else {
-        this.time.delayedCall(FIRST_VOICE_FALLBACK_MS, () =>
-            this.safeStartBgm()
-        );
-        }
-
-        // unlock autoplay mobile
-        this.input.once('pointerdown', () => {
-        if (!window.phaserBgm || !window.phaserBgm.isPlaying) {
-            this.safeStartBgm();
-        }
-        });
-    }
-
-    // ===== BGM (PHASER) =====
-    private safeStartBgm() {
-        if (window.phaserBgm && window.phaserBgm.isPlaying) return;
-
-        const bgm = this.sound.add('bgm_main', {
-        loop: true,
-        volume: 0.4,
-        });
-
-        bgm.play();
-        window.phaserBgm = bgm;
     }
     }
