@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import type { LessonPackage, LessonItem } from '../types/lesson';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { domBackgroundManager } from '../domBackground';
+import AudioManager from '../../audio/AudioManager';
 import { showGameButtons } from '../../main';
 
 type AnswerLog = {
@@ -712,8 +713,8 @@ export class LessonScene extends Phaser.Scene {
 
         if (isCorrect) {
             this.score++;
-            this.sound.play('correct');
-            this.playRandomCorrect(this.sound);
+            AudioManager.play('correct');
+            AudioManager.playRandomCorrectAnswer();
 
             // Panel đúng
             if (this.textures.exists(correctKey)) {
@@ -743,7 +744,7 @@ export class LessonScene extends Phaser.Scene {
                 },
             });
         } else {
-            this.sound.play('wrong');
+            AudioManager.play('wrong');
             // Panel sai
             if (this.textures.exists(wrongKey)) {
                 panel.setTexture(wrongKey);
@@ -793,7 +794,7 @@ export class LessonScene extends Phaser.Scene {
 
         // dừng âm thanh đang phát (trừ nhạc nền)
         this.stopAllExceptBgm();
-        this.sound.play('sfx-click');
+        AudioManager.play('sfx-click');
 
         // reset state
         this.index = 0;
@@ -815,7 +816,7 @@ export class LessonScene extends Phaser.Scene {
 
     public goToNextLevel() {
         this.stopAllExceptBgm();
-        this.sound.play('sfx-click');
+        AudioManager.play('sfx-click');
         // bỏ qua câu hiện tại, sang câu tiếp theo
         if (!this.lesson) return;
 

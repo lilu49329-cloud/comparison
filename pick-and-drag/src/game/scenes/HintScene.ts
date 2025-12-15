@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { LessonItem, LessonConcept } from '../types/lesson';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config';
+import AudioManager from '../../audio/AudioManager';
 
 type HintSceneData = {
     item: LessonItem;
@@ -346,6 +347,10 @@ export class HintScene extends Phaser.Scene {
                 if (completed) return;
                 if (gameObject !== shortPencil && gameObject !== longPencil)
                     return;
+
+                // Ngắt toàn bộ voice câu hỏi trong Hint (trừ nhạc nền)
+                this.stopAllExceptBgm();
+
                 dragStartX = gameObject.x;
                 dragStartY = gameObject.y;
 
@@ -408,7 +413,7 @@ export class HintScene extends Phaser.Scene {
 
                 if (inZone && isCorrect) {
                     // đúng: phát âm thanh + animation "nảy" rồi snap vào khung
-                    this.sound.play('correct');
+                    AudioManager.play('correct');
                     this.playRandomCorrectVoice();
                     completed = true;
                     shortPencil.disableInteractive();
@@ -442,7 +447,7 @@ export class HintScene extends Phaser.Scene {
                 } else {
                     if (inZone && !isCorrect) {
                         // Sai: phát âm thanh + lắc nhẹ
-                        this.sound.play('wrong');
+                        AudioManager.play('wrong');
                         this.tweens.add({
                             targets: gameObject,
                             x: gameObject.x + 10,
@@ -475,6 +480,22 @@ export class HintScene extends Phaser.Scene {
         );
     }
 
+    private stopAllExceptBgm() {
+        const soundManager = this.sound as any;
+        const sounds = soundManager.sounds as
+            | Phaser.Sound.BaseSound[]
+            | undefined;
+        if (!Array.isArray(sounds)) return;
+
+        sounds.forEach((snd: Phaser.Sound.BaseSound) => {
+            if (!snd || typeof snd.key !== 'string') return;
+            if (snd.key === 'bgm_main') return;
+            if (snd.isPlaying && typeof snd.stop === 'function') {
+                snd.stop();
+            }
+        });
+    }
+
     private playHintPrompt(audioKey: string | null) {
         if (!audioKey) {
             return;
@@ -504,20 +525,7 @@ export class HintScene extends Phaser.Scene {
     }
 
     private playRandomCorrectVoice() {
-        const keys = [
-            'correct_answer_1',
-            'correct_answer_2',
-            'correct_answer_3',
-            'correct_answer_4',
-        ].filter((key) => this.cache.audio && this.cache.audio.exists(key));
-
-        if (keys.length === 0) {
-            return;
-        }
-
-        const randomIndex = Phaser.Math.Between(0, keys.length - 1);
-        const key = keys[randomIndex];
-        this.sound.play(key);
+        AudioManager.playRandomCorrectAnswer();
     }
 
     private finishHint() {

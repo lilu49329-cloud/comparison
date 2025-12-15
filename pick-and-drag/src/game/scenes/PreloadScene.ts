@@ -1,6 +1,7 @@
 // src/game/scenes/PreloadScene.ts
 import Phaser from 'phaser';
 import type { LessonPackage } from '../types/lesson';
+import AudioManager from '../../audio/AudioManager';
 
 const DEFAULT_LESSON_ID = 'size_basic_01';
 
@@ -43,21 +44,6 @@ export class PreloadScene extends Phaser.Scene {
         this.load.image('hint_train_long', 'assets/hint/train-long.png');
         this.load.image('hint_hand', 'assets/hint/hand.png');
 
-        // === AUDIO CHUNG ===
-        this.load.audio('voice_rotate', 'audio/sfx/rotate.mp3');
-        // Nhạc nền chính của game
-        this.load.audio('bgm_main', 'audio/sfx/bgm_main.mp3');
-        this.load.audio('complete', 'audio/sfx/complete.mp3');
-        this.load.audio('fireworks', 'audio/sfx/fireworks.mp3');
-        this.load.audio('applause', 'audio/sfx/applause.mp3');
-        this.load.audio('sfx-click', 'audio/sfx/click.mp3');
-        this.load.audio('correct', 'audio/sfx/correct.mp3');
-        this.load.audio('wrong', 'audio/sfx/wrong.mp3');
-        this.load.audio('correct_answer_1', 'audio/sfx/correct_answer_1.mp3');
-        this.load.audio('correct_answer_2', 'audio/sfx/correct_answer_2.mp3');
-        this.load.audio('correct_answer_3', 'audio/sfx/correct_answer_3.mp3');
-        this.load.audio('correct_answer_4', 'audio/sfx/correct_answer_4.mp3');
-
         // === JSON HINT ===
         this.load.json('size_hint', 'hints/size_hint.json');
 
@@ -71,24 +57,6 @@ export class PreloadScene extends Phaser.Scene {
 
     create() {
         const rawLesson = this.cache.json.get('lessonData') as LessonPackage;
-
-        // Bật nhạc nền chính (nếu asset tồn tại), loop nhẹ nhàng xuyên suốt game
-        const bgmKey = 'bgm_main';
-        const hasBgm =
-            (this.cache.audio && this.cache.audio.exists(bgmKey)) || false;
-
-        if (hasBgm) {
-            let bgm = this.sound.get(bgmKey) as Phaser.Sound.BaseSound | null;
-            if (!bgm) {
-                bgm = this.sound.add(bgmKey, {
-                    loop: true,
-                    volume: 0.4,
-                });
-            }
-            if (bgm && !bgm.isPlaying) {
-                bgm.play();
-            }
-        }
 
         // 1) Chỉ giữ các câu có 2 lựa chọn (to / nhỏ), bỏ các câu có 3–4 khung vừa
         let filteredItems = rawLesson.items.filter(
@@ -132,9 +100,17 @@ export class PreloadScene extends Phaser.Scene {
             items: randomizedItems,
         };
 
-        // 5) preload asset cho đúng bộ câu đã chọn
-        this.preloadLessonAssets(lessonForPlay).then(() => {
+        // 5) preload asset cho đúng bộ câu đã chọn + load toàn bộ audio Howler
+        Promise.all([
+            AudioManager.loadAll(),
+            this.preloadLessonAssets(lessonForPlay),
+        ]).then(() => {
             this.lessonData = lessonForPlay;
+
+            if (!AudioManager.isPlaying('bgm_main')) {
+                AudioManager.play('bgm_main');
+            }
+
             this.scene.start('LessonScene', {
                 lesson: this.lessonData,
             });
