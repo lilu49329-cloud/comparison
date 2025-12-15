@@ -40,12 +40,7 @@ export class DomBackgroundManager {
         this.initialized = true;
     }
 
-    /**
-     * Gọi hàm này với 1 "key" bất kỳ (lessonId, concept, icon...)
-     * Trong phiên bản này, background sẽ được random giữa bg1..bg5,
-     * key chỉ dùng để giữ API tương thích.
-     */
-    setBackgroundByKey(key: string) {
+    setBackground() {
         if (!this.initialized) this.init();
         if (!this.bgLayerA || !this.bgLayerB) return;
 

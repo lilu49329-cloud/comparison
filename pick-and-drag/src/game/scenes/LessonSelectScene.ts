@@ -12,7 +12,7 @@ export class LessonSelectScene extends Phaser.Scene {
     }
 
     create() {
-        domBackgroundManager.setBackgroundByKey('DEFAULT');
+        domBackgroundManager.setBackground();
 
         // Không còn popup chọn độ khó: vào thẳng PreloadScene
         this.time.delayedCall(100, () => {

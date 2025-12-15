@@ -72,7 +72,7 @@ export class LessonScene extends Phaser.Scene {
         // Cho phép html-button gọi vào lessonScene qua global
         (window as any).lessonScene = this;
 
-        domBackgroundManager.setBackgroundByKey(this.lesson.concept);
+        domBackgroundManager.setBackground();
 
         // ===== HEADER =====
 
@@ -769,9 +769,7 @@ export class LessonScene extends Phaser.Scene {
     private nextQuestion() {
         this.index++;
         // Đổi background DOM mỗi khi sang câu mới
-        domBackgroundManager.setBackgroundByKey(
-            `${this.lesson.lessonId}_${this.index}`
-        );
+        domBackgroundManager.setBackground();
         this.showQuestion();
         this.playCurrentPrompt();
     }
@@ -810,7 +808,7 @@ export class LessonScene extends Phaser.Scene {
         this.optionPanels = [];
 
         // vẽ lại câu đầu tiên
-        domBackgroundManager.setBackgroundByKey(this.lesson.lessonId);
+        domBackgroundManager.setBackground();
         this.showQuestion();
         this.playCurrentPrompt();
     }
