@@ -349,7 +349,7 @@ export class HintScene extends Phaser.Scene {
                     return;
 
                 // Ngắt toàn bộ voice câu hỏi trong Hint (trừ nhạc nền)
-                this.stopAllExceptBgm();
+                AudioManager.stopAllExceptBgm();
 
                 dragStartX = gameObject.x;
                 dragStartY = gameObject.y;
@@ -437,7 +437,7 @@ export class HintScene extends Phaser.Scene {
                                 duration: 250,
                                 ease: 'Sine.easeInOut',
                                 onComplete: () => {
-                                    this.time.delayedCall(600, () => {
+                                    this.time.delayedCall(1000, () => {
                                         this.finishHint();
                                     });
                                 },
@@ -478,23 +478,7 @@ export class HintScene extends Phaser.Scene {
                 }
             }
         );
-    }
-
-    private stopAllExceptBgm() {
-        const soundManager = this.sound as any;
-        const sounds = soundManager.sounds as
-            | Phaser.Sound.BaseSound[]
-            | undefined;
-        if (!Array.isArray(sounds)) return;
-
-        sounds.forEach((snd: Phaser.Sound.BaseSound) => {
-            if (!snd || typeof snd.key !== 'string') return;
-            if (snd.key === 'bgm_main') return;
-            if (snd.isPlaying && typeof snd.stop === 'function') {
-                snd.stop();
-            }
-        });
-    }
+    }   
 
     private playHintPrompt(audioKey: string | null) {
         if (!audioKey) {
@@ -508,20 +492,7 @@ export class HintScene extends Phaser.Scene {
                 ? 1.4
                 : 1.0;
 
-        const hasInCache =
-            !!this.cache.audio && this.cache.audio.exists(audioKey);
-        const existingSound = this.sound.get(audioKey);
-
-        if (hasInCache || existingSound) {
-            this.sound.play(audioKey, { volume });
-            return;
-        }
-
-        this.load.audio(audioKey, audioKey);
-        this.load.once(Phaser.Loader.Events.COMPLETE, () => {
-            this.sound.play(audioKey, { volume });
-        });
-        this.load.start();
+        AudioManager.playOneShot(audioKey, volume);
     }
 
     private playRandomCorrectVoice() {

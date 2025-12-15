@@ -125,18 +125,7 @@ export class PreloadScene extends Phaser.Scene {
                     this.load.image(opt.image, opt.image);
                 }
             });
-
-            if (item.promptAudio) {
-                this.load.audio(item.promptAudio, item.promptAudio);
-            }
         });
-
-        if (lesson.defaultPromptAudio) {
-            this.load.audio(
-                lesson.defaultPromptAudio,
-                lesson.defaultPromptAudio
-            );
-        }
 
         return new Promise<void>((resolve) => {
             this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());

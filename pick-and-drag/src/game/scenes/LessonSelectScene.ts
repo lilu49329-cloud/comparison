@@ -7,10 +7,6 @@ export class LessonSelectScene extends Phaser.Scene {
         super('LessonSelectScene');
     }
 
-    preload() {
-        this.load.audio('voice_rotate', 'audio/sfx/rotate.mp3');
-    }
-
     create() {
         domBackgroundManager.setBackground();
 

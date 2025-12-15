@@ -350,26 +350,26 @@ export class LessonScene extends Phaser.Scene {
     }
     // Dừng mọi âm thanh trừ nhạc nền chính,
     // dùng khi cần ngắt nhanh tiếng đọc câu hỏi / hiệu ứng
-    private stopAllExceptBgm() {
-        const bgmKey = 'bgm_main';
-        const bgm = this.sound.get(bgmKey) as Phaser.Sound.BaseSound | null;
+    // private stopAllExceptBgm() {
+    //     const bgmKey = 'bgm_main';
+    //     const bgm = this.sound.get(bgmKey) as Phaser.Sound.BaseSound | null;
 
-        // nhớ trạng thái & volume trước khi stopAll
-        const wasPlaying = !!bgm && bgm.isPlaying;
-        // nếu muốn thay đổi âm lượng nhạc nền, chỉnh giá trị này
-        const volume = 0.4;
+    //     // nhớ trạng thái & volume trước khi stopAll
+    //     const wasPlaying = !!bgm && bgm.isPlaying;
+    //     // nếu muốn thay đổi âm lượng nhạc nền, chỉnh giá trị này
+    //     const volume = 0.4;
 
-        // dừng tất cả âm thanh
-        this.sound.stopAll();
+    //     // dừng tất cả âm thanh
+    //     this.sound.stopAll();
 
-        // nếu trước đó BGM đang chạy thì bật lại
-        if (bgm && wasPlaying) {
-            bgm.play({
-                loop: true,
-                volume,
-            });
-        }
-    }
+    //     // nếu trước đó BGM đang chạy thì bật lại
+    //     if (bgm && wasPlaying) {
+    //         bgm.play({
+    //             loop: true,
+    //             volume,
+    //         });
+    //     }
+    // }
 
     private playCurrentPrompt() {
         const item = this.lesson.items[this.index];
@@ -380,20 +380,7 @@ export class LessonScene extends Phaser.Scene {
         if (!audioKey) return;
 
         this.currentPromptAudioKey = audioKey;
-
-        const hasInCache =
-            !!(this.cache as any)?.audio?.exists?.(audioKey) ||
-            !!this.sound.get(audioKey);
-        if (hasInCache) {
-            this.sound.play(audioKey);
-            return;
-        }
-
-        this.load.audio(audioKey, audioKey);
-        this.load.once(Phaser.Loader.Events.COMPLETE, () => {
-            this.sound.play(audioKey);
-        });
-        this.load.start();
+        AudioManager.playOneShot(audioKey, 1.0);
     }
 
     // Sắp xếp lại 2 lựa chọn để ĐÁP ÁN ĐÚNG
@@ -731,8 +718,8 @@ export class LessonScene extends Phaser.Scene {
                 duration: 150,
                 repeat: 1,
                 onComplete: () => {
-                    // Sau khi tween xong, tạm dừng LessonScene và mở HintScene
-                    this.time.delayedCall(300, () => {
+                    // Sau khi tween xong, chờ voice khen gần hết rồi mới mở HintScene
+                    this.time.delayedCall(1100, () => {
                         this.scene.pause();
                         // Ẩn hẳn LessonScene để chỉ thấy màn phụ
                         this.scene.setVisible(false);
@@ -786,6 +773,10 @@ export class LessonScene extends Phaser.Scene {
             score: this.score,
             total: this.lesson.items.length,
         });
+    }
+
+    private stopAllExceptBgm() {
+        AudioManager.stopAllExceptBgm();
     }
 
     public restartLevel() {

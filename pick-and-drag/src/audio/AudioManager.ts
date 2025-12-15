@@ -17,45 +17,46 @@ const SOUND_MAP: Record<string, SoundConfig> = {
         html5: false,
     },
 
-    complete: { src: `${BASE_PATH}sfx/complete.mp3`, html5: false },
-    fireworks: { src: `${BASE_PATH}sfx/fireworks.mp3`, html5: false },
-    applause: { src: `${BASE_PATH}sfx/applause.mp3`, html5: false },
+    // Các SFX / voice chạy bằng HTML5 Audio để phù hợp policy iOS
+    complete: { src: `${BASE_PATH}sfx/complete.mp3`, html5: true },
+    fireworks: { src: `${BASE_PATH}sfx/fireworks.mp3`, html5: true },
+    applause: { src: `${BASE_PATH}sfx/applause.mp3`, html5: true },
 
     'sfx-click': {
         src: `${BASE_PATH}sfx/click.mp3`,
         volume: 0.9,
-        html5: false,
+        html5: true,
     },
     correct: {
         src: `${BASE_PATH}sfx/correct.mp3`,
         volume: 1.0,
-        html5: false,
+        html5: true,
     },
     wrong: {
         src: `${BASE_PATH}sfx/wrong.mp3`,
         volume: 0.9,
-        html5: false,
+        html5: true,
     },
 
     correct_answer_1: {
         src: `${BASE_PATH}sfx/correct_answer_1.mp3`,
         volume: 1.0,
-        html5: false,
+        html5: true,
     },
     correct_answer_2: {
         src: `${BASE_PATH}sfx/correct_answer_2.mp3`,
         volume: 1.0,
-        html5: false,
+        html5: true,
     },
     correct_answer_3: {
         src: `${BASE_PATH}sfx/correct_answer_3.mp3`,
         volume: 1.0,
-        html5: false,
+        html5: true,
     },
     correct_answer_4: {
         src: `${BASE_PATH}sfx/correct_answer_4.mp3`,
         volume: 1.0,
-        html5: false,
+        html5: true,
     },
 
     voice_rotate: { src: `${BASE_PATH}sfx/rotate.mp3`, volume: 0.9 },
@@ -64,6 +65,7 @@ const SOUND_MAP: Record<string, SoundConfig> = {
 class AudioManager {
     private sounds: Record<string, Howl> = {};
     private isLoaded = false;
+    private dynamicSounds: Record<string, Howl> = {};
 
     constructor() {
         Howler.autoUnlock = true;
@@ -142,6 +144,45 @@ class AudioManager {
     playRandomCorrectAnswer(): void {
         const index = Math.floor(Math.random() * 4) + 1;
         this.play(`correct_answer_${index}`);
+    }
+
+    /**
+     * Phát 1 file audio bất kỳ (thường dùng cho promptText, hint...),
+     * không cần khai báo trước trong SOUND_MAP.
+     * key ở đây chính là đường dẫn file (vd: 'audio/size/pencil-s.mp3').
+     */
+    playOneShot(path: string, volume = 1.0): number | undefined {
+        if (!path) return;
+
+        // HTMLMediaElement.volume chỉ cho phép [0, 1]
+        const safeVolume = Math.max(0, Math.min(volume, 1));
+
+        let snd = this.dynamicSounds[path];
+        if (!snd) {
+            snd = new Howl({
+                src: [path],
+                volume: safeVolume,
+                html5: true,
+            });
+            this.dynamicSounds[path] = snd;
+        } else {
+            snd.volume(safeVolume);
+        }
+
+        return snd.play();
+    }
+
+    stopAllExceptBgm(): void {
+        // Dừng tất cả SFX / voice, nhưng giữ nguyên trạng thái bgm_main
+        Object.entries(this.sounds).forEach(([id, snd]) => {
+            if (id === 'bgm_main') return;
+            snd.stop();
+        });
+
+        // Dừng luôn các dynamic one-shot (prompt, hint, ...)
+        Object.values(this.dynamicSounds).forEach((snd) => {
+            snd.stop();
+        });
     }
 }
 
