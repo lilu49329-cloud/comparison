@@ -65,10 +65,10 @@ function updateRotateHint() {
     rotateOverlay.style.display = shouldShow ? 'flex' : 'none';
 
     if (overlayTurnedOn) {
-        const tryPlayVoiceRotate = () => {
-            AudioManager.play('voice_rotate');
-        };
-        tryPlayVoiceRotate();
+        // Khi bật overlay xoay dọc: ngắt toàn bộ voice / SFX (trừ nhạc nền)
+        // để tránh chồng với voice_rotate.
+        AudioManager.stopAllExceptBgm();
+        AudioManager.play('voice_rotate');
     }
 
     if (overlayTurnedOff) {

@@ -40,9 +40,12 @@ export class LessonScene extends Phaser.Scene {
     private audioReplayTimer?: Phaser.Time.TimerEvent;
 
     private handleOrientationChange = () => {
-        // Khi xoay về ngang (landscape), đọc lại câu hỏi hiện tại
+        // Khi xoay về ngang (landscape), thiết lập lại cơ chế đọc câu hỏi
         if (window.innerWidth > window.innerHeight) {
-            this.playCurrentPrompt();
+            this.setupPromptReplay();
+        } else {
+            // Đang ở dọc: không auto đọc lại
+            this.clearPromptReplayTimer();
         }
     };
 
@@ -116,9 +119,7 @@ export class LessonScene extends Phaser.Scene {
             .setDepth(1); // chữ ở trên
 
         this.showQuestion();
-
-        // Đọc câu hỏi lần đầu
-        this.playCurrentPrompt();
+        this.setupPromptReplay();
 
         // Lắng nghe xoay màn hình để đọc lại câu hỏi khi xoay ngang
         window.addEventListener(
@@ -230,28 +231,10 @@ export class LessonScene extends Phaser.Scene {
 
         this.updateQuestionBarToFitText();
 
-        // Audio
+        // Audio: chỉ lưu key, logic phát & auto đọc lại xử lý ở setupPromptReplay
         const promptAudio =
             item.promptAudio || this.lesson.defaultPromptAudio || null;
         this.currentPromptAudioKey = promptAudio;
-
-        // 🔥 huỷ timer đọc lại cũ (nếu có) trước khi set câu mới
-        if (this.audioReplayTimer) {
-            this.audioReplayTimer.remove(false);
-            this.audioReplayTimer = undefined;
-        }
-
-        if (promptAudio) {
-            const hasSound =
-                this.sound.get(promptAudio) !== null ||
-                (this.cache.audio && this.cache.audio.exists(promptAudio));
-
-            if (hasSound) {
-                this.sound.play(promptAudio);
-            }
-            // 👉 đặt timer 5s đọc lại câu hỏi
-            this.schedulePromptReplay();
-        }
 
         // Clear options cũ
         this.optionImages.forEach((img) => img.destroy());
@@ -263,27 +246,7 @@ export class LessonScene extends Phaser.Scene {
         this.renderOptions(item);
     }
 
-    private schedulePromptReplay() {
-        if (!this.currentPromptAudioKey) return;
-
-        this.audioReplayTimer = this.time.addEvent({
-            delay: 10000, // 10 giây
-            callback: () => {
-                const key = this.currentPromptAudioKey;
-                if (!key) return;
-
-                const hasSound =
-                    this.sound.get(key) !== null ||
-                    (this.cache.audio && this.cache.audio.exists(key));
-
-                if (hasSound) {
-                    this.sound.play(key);
-                }
-            },
-            callbackScope: this,
-            loop: false,
-        });
-    }
+    // (đã chuyển sang cơ chế mới dùng AudioManager ở cuối file)
 
     // ===== Vẽ panel + hình cho mỗi lựa chọn =====
 
@@ -671,10 +634,7 @@ export class LessonScene extends Phaser.Scene {
         this.stopAllExceptBgm();
 
         // 🔥 bé đã chọn -> huỷ timer đọc lại câu hỏi
-        if (this.audioReplayTimer) {
-            this.audioReplayTimer.remove(false);
-            this.audioReplayTimer = undefined;
-        }
+        this.clearPromptReplayTimer();
 
         const isCorrect = optId === item.correctOptionId;
 
@@ -759,15 +719,12 @@ export class LessonScene extends Phaser.Scene {
         // Đổi background DOM mỗi khi sang câu mới
         domBackgroundManager.setBackground();
         this.showQuestion();
-        this.playCurrentPrompt();
+        this.setupPromptReplay();
     }
 
     private endLesson() {
         console.log('Answer logs:', this.answerLogs);
-        if (this.audioReplayTimer) {
-            this.audioReplayTimer.remove(false);
-            this.audioReplayTimer = undefined;
-        }
+        this.clearPromptReplayTimer();
 
         this.scene.start('SummaryScene', {
             score: this.score,
@@ -802,7 +759,7 @@ export class LessonScene extends Phaser.Scene {
         // vẽ lại câu đầu tiên
         domBackgroundManager.setBackground();
         this.showQuestion();
-        this.playCurrentPrompt();
+        this.setupPromptReplay();
     }
 
     public goToNextLevel() {
@@ -831,5 +788,44 @@ export class LessonScene extends Phaser.Scene {
         }
 
         this.nextQuestion();
+    }
+
+    // ===== CƠ CHẾ ĐỌC LẠI CÂU HỎI KHI BÉ KHÔNG THAO TÁC =====
+
+    private clearPromptReplayTimer() {
+        if (this.audioReplayTimer) {
+            this.audioReplayTimer.remove(false);
+            this.audioReplayTimer = undefined;
+        }
+    }
+
+    /**
+     * Nếu đang ở màn ngang:
+     * - Đọc câu hỏi ngay.
+     * - Sau 10s, nếu vẫn chưa chơi tiếp, đọc lại 1 lần nữa.
+     */
+    private setupPromptReplay() {
+        this.clearPromptReplayTimer();
+
+        if (window.innerWidth < window.innerHeight) {
+            return;
+        }
+
+        this.playCurrentPrompt();
+
+        if (!this.currentPromptAudioKey) return;
+
+        this.audioReplayTimer = this.time.addEvent({
+            delay: 10000,
+            loop: false,
+            callback: () => {
+                if (
+                    window.innerWidth >= window.innerHeight &&
+                    this.currentPromptAudioKey
+                ) {
+                    this.playCurrentPrompt();
+                }
+            },
+        });
     }
 }
