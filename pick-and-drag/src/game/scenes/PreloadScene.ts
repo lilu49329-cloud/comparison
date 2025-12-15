@@ -1,11 +1,15 @@
-// src/game/scenes/PreloadScene.ts
-import Phaser from 'phaser';
-import type { LessonPackage } from '../types/lesson';
-import AudioManager from '../../audio/AudioManager';
+    // src/game/scenes/PreloadScene.ts
+    import Phaser from 'phaser';
+    import type { LessonPackage } from '../types/lesson';
+    import AudioManager from '../../audio/AudioManager';
 
-const DEFAULT_LESSON_ID = 'size_basic_01';
+    const DEFAULT_LESSON_ID = 'size_basic_01';
+    const MAX_QUESTIONS = 5;
 
-export class PreloadScene extends Phaser.Scene {
+    // fallback delay nếu không có hook onend cho voice
+    const FIRST_VOICE_FALLBACK_MS = 1400;
+
+    export class PreloadScene extends Phaser.Scene {
     private lessonData!: LessonPackage;
 
     constructor() {
@@ -16,7 +20,6 @@ export class PreloadScene extends Phaser.Scene {
         // === UI CHUNG ===
         this.load.image('icon', 'assets/ui/icon.png');
 
-        // Panel nền câu hỏi & câu trả lời
         this.load.image('panel_bg', 'assets/ui/panel_bg.png');
         this.load.image('panel_bg_correct', 'assets/ui/panel_bg_ok.png');
         this.load.image('panel_bg_wrong', 'assets/ui/panel_bg_wrong.png');
@@ -24,18 +27,14 @@ export class PreloadScene extends Phaser.Scene {
         this.load.image('panel_bg_1_correct', 'assets/ui/panel_bg_1_ok.png');
         this.load.image('panel_bg_1_wrong', 'assets/ui/panel_bg_1_wrong.png');
 
-        // Thanh câu hỏi (khung câu hỏi)
         this.load.image('question_bar', 'assets/ui/question_bar.png');
-
         this.load.image('char', 'assets/characters/char.png');
 
-        // === UI KẾT THÚC BÀI HỌC ===
         this.load.image('banner_congrat', 'assets/ui/banner_congrat.png');
         this.load.image('btn_reset', 'assets/ui/btn_reset.png');
         this.load.image('btn_exit', 'assets/ui/btn_exit.png');
         this.load.image('btn_next', 'assets/ui/btn_next.png');
 
-        // === ASSET MÀN PHỤ HINT ===
         this.load.image('hint_board', 'assets/hint/board.png');
         this.load.image('hint_board_wood', 'assets/hint/board-wood.png');
         this.load.image('hint_pencil_short', 'assets/hint/pencil-short.png');
@@ -48,9 +47,8 @@ export class PreloadScene extends Phaser.Scene {
         this.load.json('size_hint', 'hints/size_hint.json');
 
         // === JSON BÀI HỌC ===
-        // XÓA JSON CŨ TRƯỚC
         if (this.cache.json.exists('lessonData')) {
-            this.cache.json.remove('lessonData');
+        this.cache.json.remove('lessonData');
         }
         this.load.json('lessonData', `lessons/${DEFAULT_LESSON_ID}.json`);
     }
@@ -58,108 +56,162 @@ export class PreloadScene extends Phaser.Scene {
     create() {
         const rawLesson = this.cache.json.get('lessonData') as LessonPackage;
 
-        // 1) Chỉ giữ các câu có 2 lựa chọn (to / nhỏ), bỏ các câu có 3–4 khung vừa
-        let filteredItems = rawLesson.items.filter(
-            (item) => item.options.length === 2
+        // 1) chỉ giữ câu 2 lựa chọn
+        let filteredItems = rawLesson.items.filter((it) => it.options.length === 2);
+        if (filteredItems.length === 0) filteredItems = rawLesson.items.slice();
+
+        // 2) shuffle + cắt max 5
+        filteredItems = Phaser.Utils.Array.Shuffle(filteredItems.slice()).slice(
+        0,
+        MAX_QUESTIONS
         );
 
-        // nếu vì lý do gì đó không còn câu nào, fallback dùng toàn bộ
-        if (filteredItems.length === 0) {
-            filteredItems = rawLesson.items.slice();
-        }
+        // 3) shuffle options trong từng câu (2 lựa chọn)
+        const randomizedItems = filteredItems.map((item) => ({
+        ...item,
+        options:
+            item.options.length === 2
+            ? Phaser.Utils.Array.Shuffle(item.options.slice())
+            : item.options,
+        }));
 
-        // 2) Random và giới hạn tối đa 5 câu
-        const MAX_QUESTIONS = 5;
+        const lessonForPlay: LessonPackage = { ...rawLesson, items: randomizedItems };
 
-        if (filteredItems.length > MAX_QUESTIONS) {
-            // copy ra mảng mới để không đụng mảng gốc
-            const shuffled = Phaser.Utils.Array.Shuffle(filteredItems.slice());
-            filteredItems = shuffled.slice(0, MAX_QUESTIONS);
-        } else {
-            // nếu muốn vẫn random thứ tự khi <= 5
-            filteredItems = Phaser.Utils.Array.Shuffle(filteredItems.slice());
-        }
-
-        // 3) Random vị trí 2 khung to/nhỏ trong từng câu
-        const randomizedItems = filteredItems.map((item) => {
-            if (item.options.length === 2) {
-                const shuffledOptions = Phaser.Utils.Array.Shuffle(
-                    item.options.slice()
-                );
-                return {
-                    ...item,
-                    options: shuffledOptions,
-                };
-            }
-            return item;
-        });
-
-        // 4) Tạo lessonForPlay SAU KHI đã lọc + random + cắt + đảo vị trí 2 khung
-        const lessonForPlay: LessonPackage = {
-            ...rawLesson,
-            items: randomizedItems,
-        };
-
-        // 5) preload asset cho đúng bộ câu đã chọn + load toàn bộ audio Howler
-        Promise.all([
-            AudioManager.loadAll(),
-            this.preloadLessonAssets(lessonForPlay),
-            this.preloadHintPromptAssets(),
-        ]).then(() => {
+        // ✅ Flow load
+        AudioManager.loadAll()
+        .then(() => this.preloadDynamicAssets(lessonForPlay))
+        .then(() => {
             this.lessonData = lessonForPlay;
 
-            if (!AudioManager.isPlaying('bgm_main')) {
-                AudioManager.play('bgm_main');
-            }
+            // Start LessonScene trước để vẽ UI
+            this.scene.start('LessonScene', { lesson: this.lessonData });
 
-            this.scene.start('LessonScene', {
-                lesson: this.lessonData,
-            });
+            // Play voice câu 1, xong mới bật bgm
+            this.playFirstPromptThenBgm();
+        })
+        .catch((e) => {
+            console.error('Preload failed:', e);
+            // fallback vẫn vào game
+            this.scene.start('LessonScene', { lesson: lessonForPlay });
+            this.safeStartBgm();
         });
     }
 
-    private async preloadLessonAssets(lesson: LessonPackage) {
-    // preload hình trong lesson
-    lesson.items.forEach((item) => {
-        // Load promptImage nếu có
+    /**
+     * Load tất cả ảnh động (lesson options + promptImage + hint promptImage) và start loader 1 lần.
+     */
+    private preloadDynamicAssets(lesson: LessonPackage) {
+        // --- lesson assets
+        lesson.items.forEach((item: any) => {
         if (item.promptImage && !this.textures.exists(item.promptImage)) {
             this.load.image(item.promptImage, item.promptImage);
         }
-        item.options.forEach((opt) => {
-            if (!this.textures.exists(opt.image)) {
-                this.load.image(opt.image, opt.image);
+        item.options.forEach((opt: any) => {
+            if (opt.image && !this.textures.exists(opt.image)) {
+            this.load.image(opt.image, opt.image);
             }
         });
-    });
+        });
 
-    return new Promise<void>((resolve) => {
+        // --- hint prompt assets
+        const rawHint = this.cache.json.get('size_hint') as any;
+        if (rawHint?.items && Array.isArray(rawHint.items)) {
+        rawHint.items.forEach((it: any) => {
+            if (it.promptImage && !this.textures.exists(it.promptImage)) {
+            this.load.image(it.promptImage, it.promptImage);
+            }
+        });
+        }
+
+        // Phaser loader: nếu không có file mới -> resolve luôn
+        if (this.load.totalToLoad === 0) return Promise.resolve();
+
+        return new Promise<void>((resolve) => {
         this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
         this.load.start();
-    });
-    }
-    private preloadHintPromptAssets() {
-    const rawHint = this.cache.json.get('size_hint') as any;
-
-    const keys = new Set<string>();
-    if (rawHint?.items && Array.isArray(rawHint.items)) {
-        rawHint.items.forEach((it: any) => {
-        if (it.promptImage) keys.add(it.promptImage);
         });
     }
 
-    keys.forEach((key) => {
-        if (!this.textures.exists(key)) {
-        this.load.image(key, key);
+    /**
+     * Phát voice câu 1, khi voice kết thúc thì bật BGM.
+     * Có fallback delay + kick bằng pointerdown để chống autoplay block.
+     */
+    private playFirstPromptThenBgm() {
+        const firstItem = this.lessonData.items?.[0];
+        const firstVoice =
+        firstItem?.promptAudio || this.lessonData.defaultPromptAudio || null;
+
+        // nếu không có voice -> bật bgm luôn
+        if (!firstVoice) {
+        this.safeStartBgm();
+        this.registry.set('played_first_prompt', true);
+        return;
         }
-    });
 
-    // Nếu không có gì để load thì resolve luôn, khỏi start loader
-    if (keys.size === 0) return Promise.resolve();
+        // đảm bảo bgm chưa chạy (nếu AudioManager có stop)
+        if ((AudioManager as any).stop) {
+        (AudioManager as any).stop('bgm_main');
+        }
 
-    return new Promise<void>((resolve) => {
-        this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
-        this.load.start();
-    });
+        // cố gắng lấy onend từ AudioManager nếu có
+        const tryHookOnEnd = () => {
+        // Nếu AudioManager.playOneShot trả về Howl/handle có .once('end')
+        // hoặc AudioManager có API kiểu playOneShotWithOnEnd
+        const anyAM: any = AudioManager;
+
+        // Option A: AudioManager.playOneShotWithOnEnd(key, vol, cb)
+        if (typeof anyAM.playOneShotWithOnEnd === 'function') {
+            anyAM.playOneShotWithOnEnd(firstVoice, 1.0, () => {
+            this.safeStartBgm();
+            });
+            return true;
+        }
+
+        // Option B: AudioManager.playOneShot(...) trả về sound handle
+        const handle = anyAM.playOneShot(firstVoice, 1.0);
+        if (handle && typeof handle.once === 'function') {
+            // howler: howl.once('end', cb)
+            handle.once('end', () => {
+            this.safeStartBgm();
+            });
+            return true;
+        }
+
+        // default: vẫn play được, nhưng không hook được end
+        // (vẫn đảm bảo đã play)
+        return false;
+        };
+
+        const hooked = tryHookOnEnd();
+
+        // fallback: delay bật bgm nếu không hook được end
+        if (!hooked) {
+        this.time.delayedCall(FIRST_VOICE_FALLBACK_MS, () => {
+            this.safeStartBgm();
+        });
+        }
+
+        // kick iOS/Android autoplay block (BGM loop hay bị chặn)
+        this.input.once('pointerdown', () => {
+        if (!AudioManager.isPlaying('bgm_main')) {
+            this.safeStartBgm();
+        }
+        });
+
+        this.registry.set('played_first_prompt', true);
     }
 
-}
+    /**
+     * Bật BGM chắc chắn: play + retry 1 lần.
+     */
+    private safeStartBgm() {
+        AudioManager.play('bgm_main');
+
+        // retry 1 nhịp nếu chưa lên
+        this.time.delayedCall(300, () => {
+        if (!AudioManager.isPlaying('bgm_main')) {
+            AudioManager.play('bgm_main');
+        }
+        });
+    }
+    }
