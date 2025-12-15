@@ -10,12 +10,6 @@ interface SoundConfig {
 const BASE_PATH = 'audio/';
 
 const SOUND_MAP: Record<string, SoundConfig> = {
-    bgm_main: {
-        src: `${BASE_PATH}sfx/bgm_main.mp3`,
-        loop: true,
-        volume: 0.4,
-        html5: false,
-    },
 
     // Các SFX / voice chạy bằng HTML5 Audio để phù hợp policy iOS
     complete: { src: `${BASE_PATH}sfx/complete.mp3`, html5: true },

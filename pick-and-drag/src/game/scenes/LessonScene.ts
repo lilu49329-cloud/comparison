@@ -75,6 +75,17 @@ export class LessonScene extends Phaser.Scene {
     }
 
     create() {
+        this.input.once('pointerdown', () => {
+        if (!window.phaserBgm || !window.phaserBgm.isPlaying) {
+            const bgm = this.sound.add('bgm_main', {
+            loop: true,
+            volume: 0.4,
+            });
+            bgm.play();
+            window.phaserBgm = bgm;
+        }
+        });
+
         // Cho phép html-button gọi vào lessonScene qua global
         (window as any).lessonScene = this;
 
@@ -340,28 +351,7 @@ export class LessonScene extends Phaser.Scene {
             ease: 'Sine.easeInOut',
         });
     }
-    // Dừng mọi âm thanh trừ nhạc nền chính,
-    // dùng khi cần ngắt nhanh tiếng đọc câu hỏi / hiệu ứng
-    // private stopAllExceptBgm() {
-    //     const bgmKey = 'bgm_main';
-    //     const bgm = this.sound.get(bgmKey) as Phaser.Sound.BaseSound | null;
 
-    //     // nhớ trạng thái & volume trước khi stopAll
-    //     const wasPlaying = !!bgm && bgm.isPlaying;
-    //     // nếu muốn thay đổi âm lượng nhạc nền, chỉnh giá trị này
-    //     const volume = 0.4;
-
-    //     // dừng tất cả âm thanh
-    //     this.sound.stopAll();
-
-    //     // nếu trước đó BGM đang chạy thì bật lại
-    //     if (bgm && wasPlaying) {
-    //         bgm.play({
-    //             loop: true,
-    //             volume,
-    //         });
-    //     }
-    // }
 
     private playCurrentPrompt() {
         const item = this.lesson.items[this.index];
