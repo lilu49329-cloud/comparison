@@ -24,6 +24,8 @@ export class LessonScene extends Phaser.Scene {
     private boy?: Phaser.GameObjects.Image;
 
     private promptText!: Phaser.GameObjects.Text;
+    private promptImage?: Phaser.GameObjects.Image;
+
     private questionBar?: Phaser.GameObjects.Image;
     private questionBarBaseWidth = 0;
     private questionBarBaseScaleX = 1;
@@ -102,21 +104,20 @@ export class LessonScene extends Phaser.Scene {
             this.questionBarBaseScaleY = bar.scaleY;
         }
 
-        // Tạo prompt text, luôn nằm trên thanh
-        this.promptText = this.add
-            .text(centerX, centerY, '', {
-                fontSize: '35px',
-                color: '#ffffff',
-                align: 'center',
-                fontFamily: '"Baloo 2"',
-                fontStyle: '700',
-                padding: {
-                    top: 10,
-                    bottom: 10,
-                },
-            })
-            .setOrigin(0.5, 0.5)
-            .setDepth(1); // chữ ở trên
+        // Prompt TEXT fallback (ẩn mặc định)
+        this.promptText = this.add.text(centerX, centerY, '', {
+        font: '700 35px "Baloo 2"', // dùng shorthand cho khỏi lỗi typings
+        color: '#ffffff',
+        align: 'center',
+        padding: { top: 10, bottom: 10 },
+        })
+        .setOrigin(0.5)
+        .setDepth(1)
+        .setVisible(false);
+
+        this.promptImage = undefined;
+
+
 
         this.showQuestion();
         this.setupPromptReplay();
@@ -186,65 +187,93 @@ export class LessonScene extends Phaser.Scene {
 
     // ===== Hiển thị 1 câu hỏi =====
 
-    private updateQuestionBarToFitText() {
-        if (!this.questionBar) return;
+    private updateQuestionBarToFitPromptImage() {
+    if (!this.questionBar || !this.promptImage) return;
 
-        const centerX = this.promptText.x;
-        const centerY = this.promptText.y;
+    const padding = 120;
+    const neededWidth = this.promptImage.displayWidth + padding;
 
-        // chiều rộng text thực tế
-        const padding = 80; // thêm khoảng trống hai bên chữ
-        const textWidth = this.promptText.width;
-        const neededWidth = textWidth + padding;
+    const baseWidth =
+        this.questionBarBaseWidth || this.questionBar.displayWidth || 1;
 
-        const baseWidth =
-            this.questionBarBaseWidth || this.questionBar.displayWidth || 1;
-
-        // mặc định: scale theo base (không kéo ngang thêm)
-        let scaleX = this.questionBarBaseScaleX;
-
-        // chỉ khi text dài hơn bar gốc mới kéo ngang
-        if (neededWidth > baseWidth) {
-            const factor = neededWidth / baseWidth;
-            scaleX = this.questionBarBaseScaleX * factor;
-        }
-
-        // scaleX thay đổi, scaleY giữ nguyên → height không đổi
-        this.questionBar.setScale(scaleX, this.questionBarBaseScaleY);
-
-        // đảm bảo bar nằm đúng dưới text
-        this.questionBar.setPosition(centerX, centerY);
+    let scaleX = this.questionBarBaseScaleX;
+    if (neededWidth > baseWidth) {
+        scaleX = this.questionBarBaseScaleX * (neededWidth / baseWidth);
     }
+
+    this.questionBar.setScale(scaleX, this.questionBarBaseScaleY);
+    this.questionBar.setPosition(this.promptImage.x, this.promptImage.y);
+    }
+
 
     private showQuestion() {
-        const item = this.lesson.items[this.index];
-        if (!item) {
-            this.endLesson();
-            return;
-        }
-
-        this.lockInput = false;
-
-        // Prompt
-        const text = item.promptText || this.lesson.defaultPromptText;
-        this.promptText.setText(text);
-
-        this.updateQuestionBarToFitText();
-
-        // Audio: chỉ lưu key, logic phát & auto đọc lại xử lý ở setupPromptReplay
-        const promptAudio =
-            item.promptAudio || this.lesson.defaultPromptAudio || null;
-        this.currentPromptAudioKey = promptAudio;
-
-        // Clear options cũ
-        this.optionImages.forEach((img) => img.destroy());
-        this.optionPanels.forEach((panel) => panel.destroy());
-        this.optionImages = [];
-        this.optionPanels = [];
-
-        // Render options mới
-        this.renderOptions(item);
+    const item = this.lesson.items[this.index];
+    if (!item) {
+        this.endLesson();
+        return;
     }
+
+    this.lockInput = false;
+
+    const centerX = GAME_WIDTH / 2 + 60;
+    const centerY = 60;
+
+    // ƯU TIÊN PROMPT IMAGE
+    const promptKey =
+    (item as any).promptImage || (this.lesson as any).defaultPromptImage;
+
+    // clear prompt image cũ
+    if (this.promptImage) {
+    this.promptImage.destroy();
+    this.promptImage = undefined;
+    }
+
+    if (promptKey && this.textures.exists(promptKey)) {
+    // Ẩn text fallback
+    this.promptText.setVisible(false);
+
+    // Tạo prompt image
+    this.promptImage = this.add
+        .image(centerX, centerY, promptKey)
+        .setOrigin(0.5)
+        .setDepth(1);
+
+    // scale để fit vào bar (70% bar)
+    if (this.questionBar) {
+        const maxW = this.questionBar.displayWidth * 0.65;
+        const maxH = this.questionBar.displayHeight * 0.65;
+
+        const texW = this.promptImage.width || 1;
+        const texH = this.promptImage.height || 1;
+
+        const s = Math.min(maxW / texW, maxH / texH);
+        this.promptImage.setScale(s);
+    }
+
+    this.updateQuestionBarToFitPromptImage();
+    } else {
+    // fallback về TEXT nếu thiếu asset
+    const text = item.promptText || (this.lesson as any).defaultPromptText || '';
+    this.promptText.setText(text);
+    this.promptText.updateText();
+    this.promptText.setVisible(true);
+
+    this.updateQuestionBarToFitPromptImage();
+    }
+
+
+    const promptAudio =
+        item.promptAudio || this.lesson.defaultPromptAudio || null;
+    this.currentPromptAudioKey = promptAudio;
+
+    this.optionImages.forEach((img) => img.destroy());
+    this.optionPanels.forEach((p) => p.destroy());
+    this.optionImages = [];
+    this.optionPanels = [];
+
+    this.renderOptions(item);
+    }
+
 
     // (đã chuyển sang cơ chế mới dùng AudioManager ở cuối file)
 
@@ -404,7 +433,7 @@ export class LessonScene extends Phaser.Scene {
             const panelW = 420;
             const panelH = 520;
 
-            const scale = this.computeItemScale(opts, panelW, panelH, 60);
+            const scale = this.computeItemScale(opts, panelW, panelH, 60) * 0.8;
 
             opts.forEach((opt, idx) => {
                 const x = startX + idx * spacing;

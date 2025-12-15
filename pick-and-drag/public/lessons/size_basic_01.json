@@ -1,122 +1,74 @@
-{
+    {
     "lessonId": "size_basic_01",
     "title": "To hơn / Nhỏ hơn",
     "concept": "SIZE",
     "defaultMode": "BINARY_PICK",
     "items": [
         {
-            "id": "q1",
-            "promptText": "CHIẾC VÁY NÀO LỚN HƠN?",
-            "promptAudio": "audio/size/pink-b.mp3",
-            "options": [
-                {
-                    "id": "opt1",
-                    "image": "assets/size/pink-small.png",
-                    "value": 1
-                },
-                {
-                    "id": "opt2",
-                    "image": "assets/size/pink-big.png",
-                    "value": 4
-                }
-            ],
-            "correctOptionId": "opt2",
-            "difficulty": 1
+        "id": "q1",
+        "promptImage": "assets/size/text-b.png",
+        "promptAudio": "audio/size/pink-b.mp3",
+        "options": [
+            { "id": "opt1", "image": "assets/size/pink-small.png", "value": 1 },
+            { "id": "opt2", "image": "assets/size/pink-big.png", "value": 4 }
+        ],
+        "correctOptionId": "opt2",
+        "difficulty": 1
         },
         {
-            "id": "q2",
-            "promptText": "CHIẾC VÁY NÀO NHỎ HƠN?",
-            "promptAudio": "audio/size/pink-s.mp3",
-            "options": [
-                {
-                    "id": "opt1",
-                    "image": "assets/size/pink-big.png",
-                    "value": 4
-                },
-                {
-                    "id": "opt2",
-                    "image": "assets/size/pink-small.png",
-                    "value": 1
-                }
-            ],
-            "correctOptionId": "opt2",
-            "difficulty": 1
+        "id": "q2",
+        "promptImage": "assets/size/text-s.png",
+        "promptAudio": "audio/size/pink-s.mp3",
+        "options": [
+            { "id": "opt1", "image": "assets/size/pink-big.png", "value": 4 },
+            { "id": "opt2", "image": "assets/size/pink-small.png", "value": 1 }
+        ],
+        "correctOptionId": "opt2",
+        "difficulty": 1
         },
         {
-            "id": "q3",
-            "promptText": "CHIẾC VÁY NÀO LỚN HƠN?",
-            "promptAudio": "audio/size/green-b.mp3",
-            "options": [
-                {
-                    "id": "opt1",
-                    "image": "assets/size/green-big.png",
-                    "value": 4
-                },
-                {
-                    "id": "opt2",
-                    "image": "assets/size/green-small.png",
-                    "value": 1
-                }
-            ],
-            "correctOptionId": "opt1",
-            "difficulty": 1
+        "id": "q3",
+        "promptImage": "assets/size/text-b.png",
+        "promptAudio": "audio/size/green-b.mp3",
+        "options": [
+            { "id": "opt1", "image": "assets/size/green-big.png", "value": 4 },
+            { "id": "opt2", "image": "assets/size/green-small.png", "value": 1 }
+        ],
+        "correctOptionId": "opt1",
+        "difficulty": 1
         },
         {
-            "id": "q4",
-            "promptText": "CHIẾC VÁY NÀO NHỎ HƠN?",
-            "promptAudio": "audio/size/green-s.mp3",
-            "options": [
-                {
-                    "id": "opt1",
-                    "image": "assets/size/green-small.png",
-                    "value": 1
-                },
-                {
-                    "id": "opt2",
-                    "image": "assets/size/green-big.png",
-                    "value": 4
-                }
-            ],
-            "correctOptionId": "opt1",
-            "difficulty": 1
+        "id": "q4",
+        "promptImage": "assets/size/text-s.png",
+        "promptAudio": "audio/size/green-s.mp3",
+        "options": [
+            { "id": "opt1", "image": "assets/size/green-small.png", "value": 1 },
+            { "id": "opt2", "image": "assets/size/green-big.png", "value": 4 }
+        ],
+        "correctOptionId": "opt1",
+        "difficulty": 1
         },
         {
-            "id": "q5",
-            "promptText": "CHIẾC VÁY NÀO LỚN HƠN?",
-            "promptAudio": "audio/size/yellow-b.mp3",
-            "options": [
-                {
-                    "id": "opt1",
-                    "image": "assets/size/yellow-big.png",
-                    "value": 4
-                },
-                {
-                    "id": "opt2",
-                    "image": "assets/size/yellow-small.png",
-                    "value": 1
-                }
-            ],
-            "correctOptionId": "opt1",
-            "difficulty": 1
+        "id": "q5",
+        "promptImage": "assets/size/text-b.png",
+        "promptAudio": "audio/size/yellow-b.mp3",
+        "options": [
+            { "id": "opt1", "image": "assets/size/yellow-big.png", "value": 4 },
+            { "id": "opt2", "image": "assets/size/yellow-small.png", "value": 1 }
+        ],
+        "correctOptionId": "opt1",
+        "difficulty": 1
         },
         {
-            "id": "q6",
-            "promptText": "CHIẾC VÁY NÀO NHỎ HƠN?",
-            "promptAudio": "audio/size/yellow-s.mp3",
-            "options": [
-                {
-                    "id": "opt1",
-                    "image": "assets/size/yellow-small.png",
-                    "value": 1
-                },
-                {
-                    "id": "opt2",
-                    "image": "assets/size/yellow-big.png",
-                    "value": 4
-                }
-            ],
-            "correctOptionId": "opt1",
-            "difficulty": 1
+        "id": "q6",
+        "promptImage": "assets/size/text-s.png",
+        "promptAudio": "audio/size/yellow-s.mp3",
+        "options": [
+            { "id": "opt1", "image": "assets/size/yellow-small.png", "value": 1 },
+            { "id": "opt2", "image": "assets/size/yellow-big.png", "value": 4 }
+        ],
+        "correctOptionId": "opt1",
+        "difficulty": 1
         }
     ]
-}
+    }

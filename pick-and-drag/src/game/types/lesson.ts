@@ -12,6 +12,7 @@ export type LessonItemOption = {
 export type LessonItem = {
     id: string;
     promptText?: string;
+    promptImage?: string;   
     promptAudio?: string;
     mode?: QuestionMode;
     options: LessonItemOption[];

@@ -10,7 +10,7 @@ type HintSceneData = {
 
 export class HintScene extends Phaser.Scene {
     private item!: LessonItem;
-    private concept!: LessonConcept;
+    // private concept!: LessonConcept;
 
     constructor() {
         super('HintScene');
@@ -18,7 +18,7 @@ export class HintScene extends Phaser.Scene {
 
     init(data: HintSceneData) {
         this.item = data.item;
-        this.concept = data.concept;
+        // this.concept = data.concept;
     }
 
     create() {
@@ -44,7 +44,8 @@ export class HintScene extends Phaser.Scene {
         }
 
         // ===== Lấy prompt từ size_hint.json (random nhưng đảm bảo đủ 4 hint trước khi lặp lại) =====
-        let hintText: string;
+        let hintPromptKey: string | null = null; // texture key của prompt dạng ảnh
+
         let hintKind: 'pencil' | 'train' = 'pencil';
         let correctIsShort = false; // true: hình ngắn là đáp án, false: hình dài
         let hintAudioKey: string | null = null;
@@ -136,7 +137,7 @@ export class HintScene extends Phaser.Scene {
             hintKind = getKind(hintItem);
             this.registry.set('size_hint_last_kind', hintKind);
 
-            hintText = hintItem.promptText || rawHint.defaultPromptText;
+            hintPromptKey = (hintItem as any).promptImage || null;
             hintAudioKey =
                 hintItem.promptAudio || rawHint.defaultPromptAudio || null;
 
@@ -150,14 +151,10 @@ export class HintScene extends Phaser.Scene {
             }
         } else {
             // fallback nếu không có JSON hint
-            hintText =
-                this.item.promptText ||
-                (this.concept === 'SIZE'
-                    ? 'Bé hãy quan sát hình to / nhỏ hơn nhé!'
-                    : 'Bé hãy quan sát lại đáp án đúng nhé!');
-            hintKind = 'pencil';
-            correctIsShort = hintText.toLowerCase().includes('ngắn');
-            hintAudioKey = this.item.promptAudio ?? null;
+        hintPromptKey =
+        (this.item as any).promptImage ||
+        null; // không có ảnh thì sẽ fallback text bên dưới
+        
         }
 
         // Banner hướng dẫn trên cùng
@@ -176,32 +173,63 @@ export class HintScene extends Phaser.Scene {
             bannerObj.setScale(s);
         }
 
+        let hintLabelWidth = 0;
+
+        // ===== PROMPT IMAGE ưu tiên =====
+        if (hintPromptKey && this.textures.exists(hintPromptKey)) {
+            // Lấy toạ độ X của bannerObj nếu có, nếu không thì w / 2
+            let imgX = w / 2;
+            if (bannerObj) {
+                imgX = bannerObj.x;
+            }
+            const img = this.add
+                .image(imgX, bannerY, hintPromptKey)
+                .setOrigin(0.5)
+                .setDepth(3);
+
+            // scale để vừa trong banner
+            if (bannerObj) {
+                const maxW = bannerObj.displayWidth * 1.55;
+                const maxH = bannerObj.displayHeight * 1.55;
+
+                const texW = img.width || 1;
+                const texH = img.height || 1;
+
+                const s = Math.min(maxW / texW, maxH / texH);
+                img.setScale(s);
+
+                hintLabelWidth = img.displayWidth;
+            } else {
+                hintLabelWidth = img.displayWidth;
+            }
+        } else {
+        // ===== fallback TEXT nếu chưa có asset =====
+        const fallbackText =
+        (this.item as any).promptText ;
+
         const hintLabel = this.add
-            .text(w / 2, bannerY, hintText, {
-                fontSize: '32px',
-                color: '#ffffff',
-                align: 'center',
-                fontFamily: '"Baloo 2"',
-                fontStyle: '700',
-                wordWrap: { width: w * 0.64 },
+            .text(w / 2, bannerY, fallbackText, {
+            font: '700 32px "Baloo 2"', // shorthand
+            color: '#ffffff',
+            align: 'center',
+            wordWrap: { width: w * 0.64 },
             })
             .setOrigin(0.5)
             .setDepth(3);
 
-        // Căn lại độ rộng banner để ôm trọn text
-        if (bannerObj) {
-            // tăng padding để banner dài hơn, ôm trọn chữ thoải mái hơn
-            const padding = 145;
-            const neededWidth = hintLabel.width + padding;
-            const baseWidth = bannerObj.displayWidth || 1;
+        hintLabelWidth = hintLabel.width;
+        }
 
-            if (neededWidth > baseWidth) {
-                const factor = neededWidth / baseWidth;
-                bannerObj.setScale(
-                    bannerObj.scaleX * factor,
-                    bannerObj.scaleY
-                );
-            }
+        // ===== Căn lại độ rộng banner để ôm nội dung =====
+        if (bannerObj) {
+        const padding = 145;
+        const neededWidth = hintLabelWidth + padding;
+        const baseWidth = bannerObj.displayWidth || 1;
+
+        if (neededWidth > baseWidth) {
+            const factor = neededWidth / baseWidth;
+            bannerObj.setScale(bannerObj.scaleX * factor, bannerObj.scaleY);
+        }
         }
 
         // Phát giọng đọc hướng dẫn cho hint (nếu có)
@@ -226,19 +254,59 @@ export class HintScene extends Phaser.Scene {
             .setOrigin(0.5)
             .setDepth(2);
 
-        // Scale 2 bút cho vừa đẹp trong board
+        // Scale riêng: bút chì ngắn và tàu đều có thể chỉnh riêng
         const maxTexW = Math.max(shortPencil.width, longPencil.width);
         const maxTexH = Math.max(shortPencil.height, longPencil.height);
         if (maxTexW > 0 && maxTexH > 0) {
-            const maxDisplayW = panelWidth * 0.55;
-            const maxDisplayH = panelHeight * 0.12;
-            const s = Math.min(
-                maxDisplayW / maxTexW,
-                maxDisplayH / maxTexH,
-                1
-            );
-            shortPencil.setScale(s);
-            longPencil.setScale(s);
+            if (hintKind === 'pencil') {
+                // Tăng riêng cho bút chì ngắn
+                const maxDisplayWShort = panelWidth * 0.5;
+                const maxDisplayHShort = panelHeight * 0.11;
+                const sShort = Math.min(
+                    maxDisplayWShort / shortPencil.width,
+                    maxDisplayHShort / shortPencil.height,
+                    1
+                );
+                // Bút chì dài giữ nguyên scale cũ
+                const maxDisplayWLong = panelWidth * 0.55;
+                const maxDisplayHLong = panelHeight * 0.12;
+                const sLong = Math.min(
+                    maxDisplayWLong / longPencil.width,
+                    maxDisplayHLong / longPencil.height,
+                    1
+                );
+                shortPencil.setScale(sShort);
+                longPencil.setScale(sLong);
+            } else if (hintKind === 'train') {
+                // Tăng riêng cho cả hai hình tàu
+                const maxDisplayWShort = panelWidth * 0.75;
+                const maxDisplayHShort = panelHeight * 0.17;
+                const sShort = Math.min(
+                    maxDisplayWShort / shortPencil.width,
+                    maxDisplayHShort / shortPencil.height,
+                    1
+                );
+                const maxDisplayWLong = panelWidth * 0.75;
+                const maxDisplayHLong = panelHeight * 0.17;
+                const sLong = Math.min(
+                    maxDisplayWLong / longPencil.width,
+                    maxDisplayHLong / longPencil.height,
+                    1
+                );
+                shortPencil.setScale(sShort);
+                longPencil.setScale(sLong);
+            } else {
+                // Các trường hợp khác giữ nguyên như cũ
+                const maxDisplayW = panelWidth * 0.55;
+                const maxDisplayH = panelHeight * 0.12;
+                const s = Math.min(
+                    maxDisplayW / maxTexW,
+                    maxDisplayH / maxTexH,
+                    1
+                );
+                shortPencil.setScale(s);
+                longPencil.setScale(s);
+            }
         }
 
         // Khung "bàn gỗ" bên dưới để thả vào – asset board-wood
@@ -278,7 +346,11 @@ export class HintScene extends Phaser.Scene {
 
         // và Y cách nhau rõ ràng, nằm phía trên bảng gỗ
         const topAboveBoard = boardBounds.top - 150;
-        const verticalGap = 75;
+        let verticalGap = 75;
+        // Nếu là tàu thì tăng khoảng cách giữa hai hình
+        if (hintKind === 'train') {
+            verticalGap = 90;
+        }
         shortPencil.y = topAboveBoard;
         longPencil.y = topAboveBoard + verticalGap;
 

@@ -104,6 +104,7 @@ export class PreloadScene extends Phaser.Scene {
         Promise.all([
             AudioManager.loadAll(),
             this.preloadLessonAssets(lessonForPlay),
+            this.preloadHintPromptAssets(),
         ]).then(() => {
             this.lessonData = lessonForPlay;
 
@@ -118,18 +119,47 @@ export class PreloadScene extends Phaser.Scene {
     }
 
     private async preloadLessonAssets(lesson: LessonPackage) {
-        // preload hình trong lesson
-        lesson.items.forEach((item) => {
-            item.options.forEach((opt) => {
-                if (!this.textures.exists(opt.image)) {
-                    this.load.image(opt.image, opt.image);
-                }
-            });
+    // preload hình trong lesson
+    lesson.items.forEach((item) => {
+        // Load promptImage nếu có
+        if (item.promptImage && !this.textures.exists(item.promptImage)) {
+            this.load.image(item.promptImage, item.promptImage);
+        }
+        item.options.forEach((opt) => {
+            if (!this.textures.exists(opt.image)) {
+                this.load.image(opt.image, opt.image);
+            }
         });
+    });
 
-        return new Promise<void>((resolve) => {
-            this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
-            this.load.start();
+    return new Promise<void>((resolve) => {
+        this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
+        this.load.start();
+    });
+    }
+    private preloadHintPromptAssets() {
+    const rawHint = this.cache.json.get('size_hint') as any;
+
+    const keys = new Set<string>();
+    if (rawHint?.items && Array.isArray(rawHint.items)) {
+        rawHint.items.forEach((it: any) => {
+        if (it.promptImage) keys.add(it.promptImage);
         });
     }
+
+    keys.forEach((key) => {
+        if (!this.textures.exists(key)) {
+        this.load.image(key, key);
+        }
+    });
+
+    // Nếu không có gì để load thì resolve luôn, khỏi start loader
+    if (keys.size === 0) return Promise.resolve();
+
+    return new Promise<void>((resolve) => {
+        this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
+        this.load.start();
+    });
+    }
+
 }

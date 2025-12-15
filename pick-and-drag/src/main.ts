@@ -1,3 +1,4 @@
+
 import Phaser from 'phaser';
 import { gameConfig } from './game/config';
 import { initRotateOrientation } from './rotateOrientation';
@@ -5,10 +6,26 @@ import { initRotateOrientation } from './rotateOrientation';
 declare global {
     interface Window {
         lessonScene: any;
+        game: Phaser.Game; // ✅ thêm dòng này
     }
 }
 
-const game = new Phaser.Game(gameConfig);
+
+
+function startGame() {
+    // Khởi tạo game sau khi font đã sẵn sàng
+    const game = new Phaser.Game(gameConfig);
+    window["game"] = game;
+}
+
+// Chờ load font 'Baloo 2' trước khi khởi tạo game để tránh FOIT/FOUT
+if (document.fonts && document.fonts.load) {
+    document.fonts.load('700 32px "Baloo 2"').then(() => {
+        startGame();
+    });
+} else {
+    startGame();
+}
 
 function resizeGame() {
     const gameDiv = document.getElementById('game-container');
@@ -59,11 +76,15 @@ export function hideGameButtons() {
     reset!.style.display = 'none';
 }
 
-// Khởi tạo xoay màn hình
-initRotateOrientation(game, {
-    mainSceneKey: 'LessonSelectScene',
-    overlaySceneKey: null,
-});
+
+// Khởi tạo xoay màn hình sau khi game đã được tạo
+// Đảm bảo gọi sau khi game đã khởi tạo
+setTimeout(() => {
+    initRotateOrientation(window["game"], {
+        mainSceneKey: 'LessonSelectScene',
+        overlaySceneKey: null,
+    });
+}, 100);
 
 // Scale nút
 updateUIButtonScale();

@@ -6,7 +6,7 @@
   "items": [
     {
       "id": "q1",
-      "promptText": "BÉ HÃY KÉO THẢ BÚT CHÌ DÀI HƠN VÀO KHUNG NHÉ.",
+      "promptImage": "assets/size/text-pencil-l.png",
       "promptAudio": "audio/size/pencil-l.mp3",
       "options": [
         {
@@ -25,7 +25,7 @@
     },
     {
       "id": "q2",
-      "promptText": "BÉ HÃY KÉO THẢ BÚT CHÌ NGẮN HƠN VÀO KHUNG NHÉ.",
+      "promptImage": "assets/size/text-pencil-s.png",
       "promptAudio": "audio/size/pencil-s.mp3",
       "options": [
         {
@@ -44,7 +44,7 @@
     },
     {
       "id": "q3",
-      "promptText": "BÉ HÃY KÉO THẢ TÀU HỎA DÀI HƠN VÀO KHUNG NHÉ.",
+      "promptImage": "assets/size/text-train-l.png",
       "promptAudio": "audio/size/train-l.mp3",
       "options": [
         {
@@ -63,7 +63,7 @@
     },
     {
       "id": "q4",
-      "promptText": "BÉ HÃY KÉO THẢ TÀU HỎA NGẮN HƠN VÀO KHUNG NHÉ.",
+      "promptImage": "assets/size/text-train-s.png",
       "promptAudio": "audio/size/train-s.mp3",
       "options": [
         {
