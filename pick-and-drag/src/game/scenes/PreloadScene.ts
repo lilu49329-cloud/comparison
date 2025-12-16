@@ -2,8 +2,29 @@
     import type { LessonPackage } from '../types/lesson';
     import AudioManager from '../../audio/AudioManager';
 
-    const DEFAULT_LESSON_ID = 'size_basic_01';
+    // ✅ danh sách lesson json có sẵn trong /public/lessons/
+    const LESSON_IDS = [
+    'size_basic_01',
+    // 'size_basic_02',
+    // 'size_basic_03',
+    ];
+
     const MAX_QUESTIONS = 5;
+
+    declare global {
+    interface Window {
+        __lessonPool?: string[];
+        __currentLessonId?: string;
+        __currentLesson?: any;
+
+        __currentLessonJsonKey?: string;
+
+        __howlerLoaded?: boolean;       // ✅ AudioManager.loadAll chỉ chạy 1 lần
+        __resetInProgress?: boolean;    // ✅ main set
+        __resetQueue?: number;          // ✅ main set
+        __requestReset?: () => void;    // ✅ main set
+    }
+    }
 
     export class PreloadScene extends Phaser.Scene {
     private lessonData!: LessonPackage;
@@ -13,47 +34,78 @@
     }
 
     preload() {
-        // ===== UI =====
-        this.load.image('icon', 'assets/ui/icon.png');
+        // ===== UI (load 1 lần, Phaser tự cache theo key) =====
+        if (!this.textures.exists('icon')) this.load.image('icon', 'assets/ui/icon.png');
 
-        this.load.image('panel_bg', 'assets/ui/panel_bg.png');
-        this.load.image('panel_bg_correct', 'assets/ui/panel_bg_ok.png');
-        this.load.image('panel_bg_wrong', 'assets/ui/panel_bg_wrong.png');
-        this.load.image('panel_bg_1', 'assets/ui/panel_bg_1.png');
-        this.load.image('panel_bg_1_correct', 'assets/ui/panel_bg_1_ok.png');
-        this.load.image('panel_bg_1_wrong', 'assets/ui/panel_bg_1_wrong.png');
+        if (!this.textures.exists('panel_bg')) this.load.image('panel_bg', 'assets/ui/panel_bg.png');
+        if (!this.textures.exists('panel_bg_correct')) this.load.image('panel_bg_correct', 'assets/ui/panel_bg_ok.png');
+        if (!this.textures.exists('panel_bg_wrong')) this.load.image('panel_bg_wrong', 'assets/ui/panel_bg_wrong.png');
+        if (!this.textures.exists('panel_bg_1')) this.load.image('panel_bg_1', 'assets/ui/panel_bg_1.png');
+        if (!this.textures.exists('panel_bg_1_correct')) this.load.image('panel_bg_1_correct', 'assets/ui/panel_bg_1_ok.png');
+        if (!this.textures.exists('panel_bg_1_wrong')) this.load.image('panel_bg_1_wrong', 'assets/ui/panel_bg_1_wrong.png');
 
-        this.load.image('question_bar', 'assets/ui/question_bar.png');
-        this.load.image('char', 'assets/characters/char.png');
+        if (!this.textures.exists('question_bar')) this.load.image('question_bar', 'assets/ui/question_bar.png');
+        if (!this.textures.exists('char')) this.load.image('char', 'assets/characters/char.png');
 
-        this.load.image('banner_congrat', 'assets/ui/banner_congrat.png');
-        this.load.image('btn_reset', 'assets/ui/btn_reset.png');
-        this.load.image('btn_exit', 'assets/ui/btn_exit.png');
-        this.load.image('btn_next', 'assets/ui/btn_next.png');
+        if (!this.textures.exists('banner_congrat')) this.load.image('banner_congrat', 'assets/ui/banner_congrat.png');
+        if (!this.textures.exists('btn_reset')) this.load.image('btn_reset', 'assets/ui/btn_reset.png');
+        if (!this.textures.exists('btn_exit')) this.load.image('btn_exit', 'assets/ui/btn_exit.png');
+        if (!this.textures.exists('btn_next')) this.load.image('btn_next', 'assets/ui/btn_next.png');
 
-        // ===== HINT =====
-        this.load.image('hint_board', 'assets/hint/board.png');
-        this.load.image('hint_board_wood', 'assets/hint/board-wood.png');
-        this.load.image('hint_pencil_short', 'assets/hint/pencil-short.png');
-        this.load.image('hint_pencil_long', 'assets/hint/pencil-long.png');
-        this.load.image('hint_train_short', 'assets/hint/train-short.png');
-        this.load.image('hint_train_long', 'assets/hint/train-long.png');
-        this.load.image('hint_hand', 'assets/hint/hand.png');
+        // ===== HINT (load 1 lần) =====
+        if (!this.textures.exists('hint_board')) this.load.image('hint_board', 'assets/hint/board.png');
+        if (!this.textures.exists('hint_board_wood')) this.load.image('hint_board_wood', 'assets/hint/board-wood.png');
+        if (!this.textures.exists('hint_pencil_short')) this.load.image('hint_pencil_short', 'assets/hint/pencil-short.png');
+        if (!this.textures.exists('hint_pencil_long')) this.load.image('hint_pencil_long', 'assets/hint/pencil-long.png');
+        if (!this.textures.exists('hint_train_short')) this.load.image('hint_train_short', 'assets/hint/train-short.png');
+        if (!this.textures.exists('hint_train_long')) this.load.image('hint_train_long', 'assets/hint/train-long.png');
+        if (!this.textures.exists('hint_hand')) this.load.image('hint_hand', 'assets/hint/hand.png');
 
-        // ===== JSON =====
+        // ===== JSON HINT (load 1 lần) =====
+        if (!this.cache.json.exists('size_hint')) {
         this.load.json('size_hint', 'hints/size_hint.json');
-
-        if (this.cache.json.exists('lessonData')) {
-        this.cache.json.remove('lessonData');
         }
-        this.load.json('lessonData', `lessons/${DEFAULT_LESSON_ID}.json`);
 
-        // ===== AUDIO FILE (CHỈ LOAD – KHÔNG PLAY) =====
+        // ✅ set pool (để debug / dùng chỗ khác)
+        (window as any).__lessonPool = LESSON_IDS.slice();
+
+        // ✅ chọn lessonId random (tránh trùng lesson vừa chơi nếu có thể)
+        const prevId = (window as any).__currentLessonId as string | undefined;
+
+        let picked = LESSON_IDS[Math.floor(Math.random() * LESSON_IDS.length)];
+        if (LESSON_IDS.length > 1 && prevId) {
+        for (let i = 0; i < 10; i++) {
+            if (picked !== prevId) break;
+            picked = LESSON_IDS[Math.floor(Math.random() * LESSON_IDS.length)];
+        }
+        }
+
+        (window as any).__currentLessonId = picked;
+
+        // ✅ cache JSON theo key riêng từng lesson -> không cần remove/reload
+        const jsonKey = `lesson_${picked}`;
+        (window as any).__currentLessonJsonKey = jsonKey;
+
+        if (!this.cache.json.exists(jsonKey)) {
+        this.load.json(jsonKey, `lessons/${picked}.json`);
+        }
+
+        // ===== AUDIO FILE (Phaser) (load 1 lần) =====
+        // NOTE: cache.audio.exists may not exist in some Phaser builds; fallback: just load, Phaser will ignore duplicates by key
+        try {
+        // @ts-ignore
+        if (!(this.cache as any).audio?.exists?.('bgm_main')) {
+            this.load.audio('bgm_main', 'audio/sfx/bgm_main.mp3');
+        }
+        } catch {
+        // fallback: safe to call load.audio again; Phaser usually keeps last/ignores duplicates by key
         this.load.audio('bgm_main', 'audio/sfx/bgm_main.mp3');
+        }
     }
 
     async create() {
-        const rawLesson = this.cache.json.get('lessonData') as LessonPackage;
+        const jsonKey = (window as any).__currentLessonJsonKey as string;
+        const rawLesson = this.cache.json.get(jsonKey) as LessonPackage;
 
         // 1️⃣ chỉ giữ câu 2 lựa chọn (fallback nếu không có)
         let items = rawLesson.items.filter((it) => it.options.length === 2);
@@ -76,21 +128,32 @@
         items: randomizedItems,
         };
 
-        try {
-        // 4️⃣ load toàn bộ audio Howler (voice, sfx…) – CHỈ LOAD
-        await AudioManager.loadAll();
+        (window as any).__currentLesson = lessonForPlay;
 
-        // 5️⃣ load ảnh động theo lesson
+        try {
+        // ✅ Howler load 1 lần cho cả runtime
+        if (!(window as any).__howlerLoaded) {
+            await AudioManager.loadAll();
+            (window as any).__howlerLoaded = true;
+        }
+
+        // ✅ load dynamic assets theo lesson (chỉ những cái chưa có)
         await this.preloadDynamicAssets(lessonForPlay);
 
-        // ❗❗ TUYỆT ĐỐI KHÔNG PLAY ÂM THANH Ở ĐÂY ❗❗
         this.lessonData = lessonForPlay;
-
-        // 6️⃣ sang LessonScene
         this.scene.start('LessonScene', { lesson: this.lessonData });
         } catch (e) {
         console.error('PreloadScene error:', e);
         this.scene.start('LessonScene', { lesson: lessonForPlay });
+        } finally {
+        // ✅ nhả reset lock + chạy tiếp queue nếu user spam
+        (window as any).__resetInProgress = false;
+
+        const q = (window as any).__resetQueue ?? 0;
+        if (q > 0) {
+            (window as any).__resetQueue = q - 1;
+            (window as any).__requestReset?.();
+        }
         }
     }
 

@@ -59,6 +59,11 @@
     }
 
     init(data: { lesson: LessonPackage }) {
+        (window as any).__currentLesson = data.lesson;
+        console.log('POOL size', window.__lessonPool?.length);
+        
+
+
         this.lesson = data.lesson;
 
         // reset state mỗi lần vào lesson

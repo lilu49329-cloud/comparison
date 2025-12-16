@@ -1,35 +1,49 @@
+    import Phaser from 'phaser';
+    import { gameConfig } from './game/config';
+    import { initRotateOrientation } from './rotateOrientation';
+    import AudioManager from './audio/AudioManager'; // ✅ nếu path khác thì sửa lại
 
-import Phaser from 'phaser';
-import { gameConfig } from './game/config';
-import { initRotateOrientation } from './rotateOrientation';
-
-declare global {
+    declare global {
     interface Window {
-        lessonScene: any;
-        game: Phaser.Game; // ✅ thêm dòng này
+        lessonScene?: any;
+        hintScene?: any;
+
+        // (tuỳ chọn) để debug / chia sẻ state
+        __currentLesson?: any;
+        __currentLessonId?: string;
+        __lessonPool?: string[];
+
+        __lastResetAt?: number;
+
+        game?: Phaser.Game;
     }
-}
+    }
 
-
-
-function startGame() {
-    // Khởi tạo game sau khi font đã sẵn sàng
+    function startGame() {
     const game = new Phaser.Game(gameConfig);
-    window["game"] = game;
-}
+    window.game = game;
 
-// Chờ load font 'Baloo 2' trước khi khởi tạo game để tránh FOIT/FOUT
-if (document.fonts && document.fonts.load) {
-    document.fonts.load('700 32px "Baloo 2"').then(() => {
-        startGame();
-    });
-} else {
+    setTimeout(() => {
+        if (!window.game) return;
+        initRotateOrientation(window.game, {
+        mainSceneKey: 'LessonSelectScene',
+        overlaySceneKey: null,
+        });
+    }, 100);
+
+    resizeGame();
+    updateUIButtonScale();
+    }
+
+    // Chờ load font 'Baloo 2' trước khi khởi tạo game để tránh FOIT/FOUT
+    if (document.fonts && document.fonts.load) {
+    document.fonts.load('700 32px "Baloo 2"').then(() => startGame());
+    } else {
     startGame();
-}
+    }
 
-function resizeGame() {
+    function resizeGame() {
     const gameDiv = document.getElementById('game-container');
-
     const w = window.innerWidth;
     const h = window.innerHeight;
 
@@ -38,67 +52,71 @@ function resizeGame() {
         gameDiv.style.width = `${w}px`;
         gameDiv.style.height = `${h}px`;
     }
-}
+    }
 
-window.addEventListener('resize', () => {
+    window.addEventListener('resize', () => {
     resizeGame();
-});
-window.addEventListener('orientationchange', () => {
+    updateUIButtonScale();
+    });
+    window.addEventListener('orientationchange', () => {
     resizeGame();
-});
+    updateUIButtonScale();
+    });
 
-function updateUIButtonScale() {
-    const container = document.getElementById('game-container')!;
-    const resetBtn = document.getElementById('btn-reset') as HTMLImageElement;
+    function updateUIButtonScale() {
+    const container = document.getElementById('game-container');
+    const resetBtn = document.getElementById('btn-reset') as HTMLImageElement | null;
+
+    if (!container || !resetBtn) return;
 
     const w = container.clientWidth;
     const h = container.clientHeight;
 
-    // base height = 720 (game design gốc)
     const scale = Math.min(w, h) / 720;
-
-    const baseSize = 80; // kích thước nút thiết kế gốc (80px)
+    const baseSize = 80;
     const newSize = baseSize * scale;
 
     resetBtn.style.width = `${newSize}px`;
     resetBtn.style.height = 'auto';
-}
-
-export function showGameButtons() {
-    const reset = document.getElementById('btn-reset');
-
-    reset!.style.display = 'block';
-}
-
-export function hideGameButtons() {
-    const reset = document.getElementById('btn-reset');
-
-    reset!.style.display = 'none';
-}
-
-
-// Khởi tạo xoay màn hình sau khi game đã được tạo
-// Đảm bảo gọi sau khi game đã khởi tạo
-setTimeout(() => {
-    initRotateOrientation(window["game"], {
-        mainSceneKey: 'LessonSelectScene',
-        overlaySceneKey: null,
-    });
-}, 100);
-
-// Scale nút
-updateUIButtonScale();
-window.addEventListener('resize', updateUIButtonScale);
-window.addEventListener('orientationchange', updateUIButtonScale);
-
-    document.getElementById('btn-reset')?.addEventListener('click', () => {
-    // ✅ ưu tiên restart Hint nếu đang mở Hint
-    const hint = (window as any).hintScene;
-    if (hint && hint.scene?.isActive && hint.scene.isActive()) {
-        hint.restartHint?.();
-        return;
     }
 
-    // ✅ fallback: restart Lesson
-    (window as any).lessonScene?.restartLevel?.();
+    export function showGameButtons() {
+    const reset = document.getElementById('btn-reset');
+    if (!reset) return;
+    reset.style.display = 'block';
+    updateUIButtonScale();
+    }
+
+    export function hideGameButtons() {
+    const reset = document.getElementById('btn-reset');
+    if (!reset) return;
+    reset.style.display = 'none';
+    }
+
+    // ✅ RESET: bấm là về PreloadScene để nó random lesson + load json lại
+    document.getElementById('btn-reset')?.addEventListener('click', () => {
+    const game = window.game;
+    if (!game) return;
+
+    // chống double fire quá nhanh (touch/click)
+    const now = Date.now();
+    if (window.__lastResetAt && now - window.__lastResetAt < 120) return;
+    window.__lastResetAt = now;
+
+    // dừng voice/sfx (giữ BGM tuỳ bạn)
+    try {
+        AudioManager.stopAllExceptBgm();
+    } catch {}
+
+    const sm = game.scene;
+
+    // stop các scene gameplay có thể đang mở
+    const scenesToStop = ['HintScene', 'SummaryScene', 'LessonScene', 'PreloadScene'];
+    for (const key of scenesToStop) {
+        const s = sm.getScene(key) as Phaser.Scene | null;
+        if (s && s.scene?.isActive()) sm.stop(key);
+    }
+
+    // ✅ quay về preload (PreloadScene sẽ pick random lessonId + load json)
+    sm.start('PreloadScene');
     });
