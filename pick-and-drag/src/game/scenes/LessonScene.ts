@@ -321,6 +321,10 @@
         const centerX = GAME_WIDTH / 2 + 60;
         const centerY = 60;
 
+        if (this.questionBar) {
+            this.questionBar.setScale(this.questionBarBaseScaleX, this.questionBarBaseScaleY);
+            this.questionBar.setPosition(centerX, centerY);
+            }
         const promptKey =
         (item as any).promptImage || (this.lesson as any).defaultPromptImage;
 
@@ -338,8 +342,11 @@
             .setDepth(1);
 
         if (this.questionBar) {
-            const maxW = this.questionBar.displayWidth * 0.9;
-            const maxH = this.questionBar.displayHeight * 0.9;
+        const baseBarW = this.questionBarBaseWidth || this.questionBar.displayWidth;
+        const baseBarH = (this.questionBar.height || 1) * this.questionBarBaseScaleY; // base display height
+        const maxW = baseBarW * 0.9;
+        const maxH = baseBarH * 0.9;
+
 
             const texW = this.promptImage.width || 1;
             const texH = this.promptImage.height || 1;
