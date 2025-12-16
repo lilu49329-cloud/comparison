@@ -145,26 +145,32 @@ class AudioManager {
      * không cần khai báo trước trong SOUND_MAP.
      * key ở đây chính là đường dẫn file (vd: 'audio/size/pencil-s.mp3').
      */
-    playOneShot(path: string, volume = 1.0): number | undefined {
-        if (!path) return;
+    playOneShot(path: string, volume = 1.0, onEnd?: () => void): number | undefined {
+    if (!path) return;
 
-        // HTMLMediaElement.volume chỉ cho phép [0, 1]
-        const safeVolume = Math.max(0, Math.min(volume, 1));
+    const safeVolume = Math.max(0, Math.min(volume, 1));
 
-        let snd = this.dynamicSounds[path];
-        if (!snd) {
-            snd = new Howl({
-                src: [path],
-                volume: safeVolume,
-                html5: true,
-            });
-            this.dynamicSounds[path] = snd;
-        } else {
-            snd.volume(safeVolume);
-        }
-
-        return snd.play();
+    let snd = this.dynamicSounds[path];
+    if (!snd) {
+        snd = new Howl({
+        src: [path],
+        volume: safeVolume,
+        html5: true,
+        });
+        this.dynamicSounds[path] = snd;
+    } else {
+        snd.volume(safeVolume);
     }
+
+    const id = snd.play();
+
+    if (onEnd && id !== undefined) {
+        snd.once('end', onEnd, id);
+    }
+
+    return id;
+    }
+
 
     stopAllExceptBgm(): void {
         // Dừng tất cả SFX / voice, nhưng giữ nguyên trạng thái bgm_main

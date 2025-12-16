@@ -91,6 +91,14 @@ updateUIButtonScale();
 window.addEventListener('resize', updateUIButtonScale);
 window.addEventListener('orientationchange', updateUIButtonScale);
 
-document.getElementById('btn-reset')?.addEventListener('click', () => {
-    window.lessonScene?.restartLevel();
-});
+    document.getElementById('btn-reset')?.addEventListener('click', () => {
+    // ✅ ưu tiên restart Hint nếu đang mở Hint
+    const hint = (window as any).hintScene;
+    if (hint && hint.scene?.isActive && hint.scene.isActive()) {
+        hint.restartHint?.();
+        return;
+    }
+
+    // ✅ fallback: restart Lesson
+    (window as any).lessonScene?.restartLevel?.();
+    });

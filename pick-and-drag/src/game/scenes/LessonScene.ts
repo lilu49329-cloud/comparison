@@ -20,9 +20,16 @@
     // ✅ chỉ cần 1 lần chạm toàn app là unlock (persist trong runtime)
     private static audioUnlocked = false;
 
+    // ✅ duck CHỈ 1 LẦN DUY NHẤT khi mới vào game (trong runtime)
+    private static duckedOnceAtGameStart = false;
+
     private lesson!: LessonPackage;
     private index = 0;
     private score = 0;
+
+    // bgm volume
+    private readonly BGM_NORMAL_VOL = 0.4;
+    private readonly BGM_DUCK_VOL = 0.08;
 
     private boy?: Phaser.GameObjects.Image;
 
@@ -67,13 +74,74 @@
         this.optionPanels = [];
     }
 
+    private setBgmVolumeSafe(v: number) {
+        const bgm: any = (window as any).phaserBgm;
+        if (!bgm) return;
+
+        try {
+        // Phaser Sound
+        if (typeof bgm.setVolume === 'function') {
+            bgm.setVolume(v);
+            return;
+        }
+        // Phaser Sound (property)
+        if (typeof bgm.volume === 'number') {
+            bgm.volume = v;
+            return;
+        }
+        // Howler Howl (nếu lỡ gán bgm từ Howler)
+        if (typeof bgm.volume === 'function') {
+            bgm.volume(v);
+            return;
+        }
+        } catch {}
+    }
+
     private ensureBgm() {
         const w = window as any;
-        if (w.phaserBgm && w.phaserBgm.isPlaying) return;
 
-        const bgm = this.sound.add('bgm_main', { loop: true, volume: 0.4 });
+        if (w.phaserBgm && w.phaserBgm.isPlaying) {
+        // luôn giữ bgm ở mức thường khi đảm bảo bgm
+        this.setBgmVolumeSafe(this.BGM_NORMAL_VOL);
+        return;
+        }
+
+        const bgm = this.sound.add('bgm_main', {
+        loop: true,
+        volume: this.BGM_NORMAL_VOL,
+        });
         bgm.play();
         w.phaserBgm = bgm;
+
+        this.setBgmVolumeSafe(this.BGM_NORMAL_VOL);
+    }
+
+    /**
+     * duckAtGameStart = true  -> chỉ duck đúng 1 lần duy nhất toàn game runtime
+     * duckAtGameStart = false -> không duck
+     */
+    private playCurrentPrompt(duckAtGameStart = false) {
+        if (!LessonScene.audioUnlocked) return;
+
+        const item = this.lesson.items[this.index];
+        if (!item) return;
+
+        const audioKey = item.promptAudio || this.lesson.defaultPromptAudio || null;
+        if (!audioKey) return;
+
+        const shouldDuckOnce =
+        duckAtGameStart && !LessonScene.duckedOnceAtGameStart;
+
+        if (shouldDuckOnce) {
+        LessonScene.duckedOnceAtGameStart = true;
+        this.setBgmVolumeSafe(this.BGM_DUCK_VOL);
+        }
+
+        // ⚠️ AudioManager.playOneShot của bạn phải hỗ trợ callback kết thúc.
+        // Nếu chưa có callback, nói mình để mình đưa bản AudioManager tương thích.
+        AudioManager.playOneShot(audioKey, 1.0, () => {
+        if (shouldDuckOnce) this.setBgmVolumeSafe(this.BGM_NORMAL_VOL);
+        });
     }
 
     // ===== replay helpers =====
@@ -91,19 +159,19 @@
         if (!LessonScene.audioUnlocked) return;
 
         const scheduledAt = Date.now();
-        this.promptReplayTimer = this.time.delayedCall(this.PROMPT_REPLAY_DELAY_MS, () => {
-        // nếu có tương tác sau thời điểm schedule -> bỏ
-        if (this.lastInteractionAt > scheduledAt) return;
+        this.promptReplayTimer = this.time.delayedCall(
+        this.PROMPT_REPLAY_DELAY_MS,
+        () => {
+            if (this.lastInteractionAt > scheduledAt) return;
+            if (!this.scene.isActive()) return;
+            if (!this.scene.isVisible()) return;
 
-        // chỉ đọc khi scene còn active + visible
-        if (!this.scene.isActive()) return;
-        if (!this.scene.isVisible()) return;
+            // ✅ auto replay: KHÔNG duck
+            this.playCurrentPrompt(false);
 
-        this.playCurrentPrompt();
-
-        // ✅ lặp lại mỗi 10s cho tới khi bé tương tác
-        this.resetPromptReplayTimer();
-        });
+            this.resetPromptReplayTimer();
+        }
+        );
     }
 
     private markInteraction() {
@@ -116,7 +184,6 @@
 
         domBackgroundManager.setBackground();
 
-        // cleanup timer
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
         this.clearPromptReplayTimer();
         });
@@ -127,13 +194,10 @@
 
         if (this.textures.exists('question_bar')) {
         const baseDisplayWidth = GAME_WIDTH * 0.4;
-
         const bar = this.add.image(centerX, centerY, 'question_bar').setOrigin(0.5);
 
         const texW = bar.width || 1;
-        const s = baseDisplayWidth / texW;
-
-        bar.setScale(s);
+        bar.setScale(baseDisplayWidth / texW);
 
         this.questionBar = bar;
         this.questionBarBaseWidth = bar.displayWidth;
@@ -149,7 +213,7 @@
             align: 'center',
             padding: { top: 10, bottom: 10 },
         })
-        .setOrigin(0.5)
+        .setOrigin(0.5, 0.7)
         .setDepth(1)
         .setVisible(false);
 
@@ -160,13 +224,22 @@
 
         // ===== Unlock audio chỉ lần đầu =====
         if (LessonScene.audioUnlocked) {
-        // đã unlock: auto phát luôn
-        this.playCurrentPrompt();
         this.ensureBgm();
-        this.markInteraction(); // start timer 10s
+
+        // ✅ chỉ duck 1 lần duy nhất toàn game runtime (lần phát prompt đầu tiên)
+        this.playCurrentPrompt(true);
+
+        this.markInteraction();
         } else {
         const tapBlocker = this.add
-            .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.001)
+            .rectangle(
+            GAME_WIDTH / 2,
+            GAME_HEIGHT / 2,
+            GAME_WIDTH,
+            GAME_HEIGHT,
+            0x000000,
+            0.001
+            )
             .setDepth(999)
             .setInteractive();
 
@@ -174,9 +247,12 @@
             LessonScene.audioUnlocked = true;
             tapBlocker.destroy();
 
-            this.playCurrentPrompt();
             this.ensureBgm();
-            this.markInteraction(); // start timer 10s sau lần chạm unlock
+
+            // ✅ chỉ duck 1 lần duy nhất toàn game runtime
+            this.playCurrentPrompt(true);
+
+            this.markInteraction();
         });
         }
 
@@ -212,7 +288,6 @@
         });
         }
 
-        // ✅ luôn show buttons
         showGameButtons();
     }
 
@@ -246,7 +321,8 @@
         const centerX = GAME_WIDTH / 2 + 60;
         const centerY = 60;
 
-        const promptKey = (item as any).promptImage || (this.lesson as any).defaultPromptImage;
+        const promptKey =
+        (item as any).promptImage || (this.lesson as any).defaultPromptImage;
 
         if (this.promptImage) {
         this.promptImage.destroy();
@@ -256,11 +332,14 @@
         if (promptKey && this.textures.exists(promptKey)) {
         this.promptText.setVisible(false);
 
-        this.promptImage = this.add.image(centerX, centerY, promptKey).setOrigin(0.5).setDepth(1);
+        this.promptImage = this.add
+            .image(centerX, centerY, promptKey)
+            .setOrigin(0.5)
+            .setDepth(1);
 
         if (this.questionBar) {
-            const maxW = this.questionBar.displayWidth * 0.65;
-            const maxH = this.questionBar.displayHeight * 0.65;
+            const maxW = this.questionBar.displayWidth * 0.9;
+            const maxH = this.questionBar.displayHeight * 0.9;
 
             const texW = this.promptImage.width || 1;
             const texH = this.promptImage.height || 1;
@@ -341,18 +420,6 @@
         });
     }
 
-    private playCurrentPrompt() {
-        if (!LessonScene.audioUnlocked) return;
-
-        const item = this.lesson.items[this.index];
-        if (!item) return;
-
-        const audioKey = item.promptAudio || this.lesson.defaultPromptAudio || null;
-        if (!audioKey) return;
-
-        AudioManager.playOneShot(audioKey, 1.0);
-    }
-
     private arrangeBinaryOptionsByCorrect(item: LessonItem): LessonItem['options'] {
         const opts = [...item.options];
         if (opts.length !== 2) return opts;
@@ -399,7 +466,10 @@
         opts.forEach((opt, idx) => {
             const x = startX + idx * spacing;
 
-            const panel = this.add.image(x, panelY, 'panel_bg').setOrigin(0.5).setDisplaySize(panelW, panelH);
+            const panel = this.add
+            .image(x, panelY, 'panel_bg')
+            .setOrigin(0.5)
+            .setDisplaySize(panelW, panelH);
             panel.setInteractive({ useHandCursor: true });
 
             const img = this.add.image(x, panelY, opt.image).setOrigin(0.5);
@@ -414,7 +484,11 @@
             panel.on('pointerdown', handleClick);
             img.on('pointerdown', handleClick);
 
-            panel.setData('panelKeys', { base: 'panel_bg', correct: 'panel_bg_correct', wrong: 'panel_bg_wrong' });
+            panel.setData('panelKeys', {
+            base: 'panel_bg',
+            correct: 'panel_bg_correct',
+            wrong: 'panel_bg_wrong',
+            });
 
             this.optionImages.push(img);
             this.optionPanels.push(panel);
@@ -431,7 +505,10 @@
         opts.forEach((opt, idx) => {
             const x = startX + idx * spacing;
 
-            const panel = this.add.image(x, panelY, 'panel_bg').setOrigin(0.5).setDisplaySize(panelW, panelH);
+            const panel = this.add
+            .image(x, panelY, 'panel_bg')
+            .setOrigin(0.5)
+            .setDisplaySize(panelW, panelH);
             panel.setInteractive({ useHandCursor: true });
 
             const img = this.add.image(x, panelY, opt.image).setOrigin(0.5);
@@ -446,7 +523,11 @@
             panel.on('pointerdown', handleClick);
             img.on('pointerdown', handleClick);
 
-            panel.setData('panelKeys', { base: 'panel_bg', correct: 'panel_bg_correct', wrong: 'panel_bg_wrong' });
+            panel.setData('panelKeys', {
+            base: 'panel_bg',
+            correct: 'panel_bg_correct',
+            wrong: 'panel_bg_wrong',
+            });
 
             this.optionImages.push(img);
             this.optionPanels.push(panel);
@@ -474,7 +555,10 @@
         opts.forEach((opt, idx) => {
             const pos = positions[idx] ?? positions[positions.length - 1];
 
-            const panel = this.add.image(pos.x, pos.y, 'panel_bg_1').setOrigin(0.5).setDisplaySize(panelW, panelH);
+            const panel = this.add
+            .image(pos.x, pos.y, 'panel_bg_1')
+            .setOrigin(0.5)
+            .setDisplaySize(panelW, panelH);
             panel.setInteractive({ useHandCursor: true });
 
             const img = this.add.image(pos.x, pos.y, opt.image).setOrigin(0.5);
@@ -489,7 +573,11 @@
             panel.on('pointerdown', handleClick);
             img.on('pointerdown', handleClick);
 
-            panel.setData('panelKeys', { base: 'panel_bg_1', correct: 'panel_bg_1_correct', wrong: 'panel_bg_1_wrong' });
+            panel.setData('panelKeys', {
+            base: 'panel_bg_1',
+            correct: 'panel_bg_1_correct',
+            wrong: 'panel_bg_1_wrong',
+            });
 
             this.optionImages.push(img);
             this.optionPanels.push(panel);
@@ -506,7 +594,10 @@
         opts.forEach((opt, idx) => {
             const x = startX + idx * spacing;
 
-            const panel = this.add.image(x, panelY, 'panel_bg').setOrigin(0.5).setDisplaySize(panelW, panelH);
+            const panel = this.add
+            .image(x, panelY, 'panel_bg')
+            .setOrigin(0.5)
+            .setDisplaySize(panelW, panelH);
             panel.setInteractive({ useHandCursor: true });
 
             const img = this.add.image(x, panelY, opt.image).setOrigin(0.5);
@@ -521,7 +612,11 @@
             panel.on('pointerdown', handleClick);
             img.on('pointerdown', handleClick);
 
-            panel.setData('panelKeys', { base: 'panel_bg', correct: 'panel_bg_correct', wrong: 'panel_bg_wrong' });
+            panel.setData('panelKeys', {
+            base: 'panel_bg',
+            correct: 'panel_bg_correct',
+            wrong: 'panel_bg_wrong',
+            });
 
             this.optionImages.push(img);
             this.optionPanels.push(panel);
@@ -529,15 +624,17 @@
         }
     }
 
-    // ===== Xử lý chọn đáp án =====
-    private onSelect(item: LessonItem, optId: string, img: Phaser.GameObjects.Image, panel: Phaser.GameObjects.Image) {
-        // ✅ có tương tác -> reset timer
+    private onSelect(
+        item: LessonItem,
+        optId: string,
+        img: Phaser.GameObjects.Image,
+        panel: Phaser.GameObjects.Image
+    ) {
         this.markInteraction();
 
         if (this.lockInput) return;
         this.lockInput = true;
 
-        // bé chọn đáp án -> ngắt tiếng khác
         AudioManager.stopAllExceptBgm();
 
         const isCorrect = optId === item.correctOptionId;
@@ -578,7 +675,6 @@
             repeat: 1,
             onComplete: () => {
             this.time.delayedCall(1100, () => {
-                // sang HintScene -> clear timer để khỏi đọc lại dưới nền
                 this.clearPromptReplayTimer();
 
                 this.scene.pause();
@@ -614,17 +710,16 @@
     }
 
     private nextQuestion() {
-        // ✅ sang câu = coi như bắt đầu vòng mới -> reset timer
         this.markInteraction();
 
         this.index++;
         domBackgroundManager.setBackground();
         this.showQuestion();
 
-        // ✅ đã unlock thì auto đọc mọi câu tiếp theo
+        // ✅ các câu tiếp theo: KHÔNG duck
         if (LessonScene.audioUnlocked) {
-        this.playCurrentPrompt();
         this.ensureBgm();
+        this.playCurrentPrompt(false);
         }
     }
 
@@ -641,7 +736,6 @@
     public restartLevel() {
         if (!this.lesson) return;
 
-        // ✅ restart = tương tác -> reset timer
         this.markInteraction();
 
         AudioManager.stopAllExceptBgm();
@@ -660,16 +754,15 @@
         domBackgroundManager.setBackground();
         this.showQuestion();
 
-        // ✅ restart thì nếu đã unlock -> tự phát luôn
+        // ✅ restart cũng KHÔNG duck (vì chỉ duck lúc mới vào game)
         if (LessonScene.audioUnlocked) {
-        this.playCurrentPrompt();
         this.ensureBgm();
+        this.playCurrentPrompt(false);
         this.resetPromptReplayTimer();
         }
     }
 
     public goToNextLevel() {
-        // ✅ skip cũng là tương tác -> reset timer
         this.markInteraction();
 
         AudioManager.stopAllExceptBgm();

@@ -10,7 +10,10 @@ type HintSceneData = {
 
 export class HintScene extends Phaser.Scene {
     private item!: LessonItem;
+    private boy?: Phaser.GameObjects.Image;
+
     // private concept!: LessonConcept;
+    private concept!: LessonConcept;
 
     constructor() {
         super('HintScene');
@@ -18,12 +21,58 @@ export class HintScene extends Phaser.Scene {
 
     init(data: HintSceneData) {
         this.item = data.item;
-        // this.concept = data.concept;
+        this.concept = data.concept;
     }
 
     create() {
+        (window as any).hintScene = this;
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        (window as any).hintScene = undefined;
+        });
+
         const w = GAME_WIDTH;
         const h = GAME_HEIGHT;
+        // ===== Nhân vật đồng hành (giống LessonScene) =====
+        const characterKeys = ['char'];
+        const availableKeys = characterKeys.filter((key) => this.textures.exists(key));
+
+        if (availableKeys.length > 0) {
+        const chosenKey =
+            availableKeys[Math.floor(Math.random() * availableKeys.length)];
+
+        // đặt góc trái dưới, hơi lệch vào trong
+        const baseX = 140;
+        const baseY = GAME_HEIGHT - 40;
+
+        this.boy = this.add.image(baseX, baseY, chosenKey).setOrigin(0.5, 1);
+
+        const MAX_H = 350;
+        const MAX_W = 220;
+
+        const texW = this.boy.width || 1;
+        const texH = this.boy.height || 1;
+
+        const scale = Math.min(MAX_H / texH, MAX_W / texW);
+        this.boy.setScale(scale);
+
+        // HintScene có nhiều layer depth 1-4, nên cho nhân vật nằm dưới board
+        this.boy.setDepth(0);
+
+        this.tweens.add({
+            targets: this.boy,
+            y: this.boy.y - 10,
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+        });
+        }
+
+        // cleanup cho chắc
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        this.boy?.destroy();
+        this.boy = undefined;
+        });
+
 
         // Khung trắng chính (bảng trắng hint) – canvas Hint giữ trong suốt,
         // không phủ lớp mờ lên toàn bộ game
@@ -32,7 +81,7 @@ export class HintScene extends Phaser.Scene {
 
         if (this.textures.exists('hint_board')) {
             const mainPanelImg = this.add
-                .image(w / 2, h / 2, 'hint_board')
+                .image(w / 2, h / 2 +40, 'hint_board')
                 .setOrigin(0.5)
                 .setDepth(1);
             mainPanelImg.setDisplaySize(panelWidth, panelHeight);
@@ -184,7 +233,7 @@ export class HintScene extends Phaser.Scene {
             }
             const img = this.add
                 .image(imgX, bannerY, hintPromptKey)
-                .setOrigin(0.5)
+                .setOrigin(0.5, 0.62)
                 .setDepth(3);
 
             // scale để vừa trong banner
@@ -236,7 +285,7 @@ export class HintScene extends Phaser.Scene {
         this.playHintPrompt(hintAudioKey);
 
         // ===== Vùng minh hoạ bút chì + bàn kéo thả =====
-        const centerY = h / 2 - 40;
+        const centerY = h / 2 ;
 
         // Hai hình cố định bên trong board (ngắn & dài) – bút chì hoặc tàu
         const shortKey =
@@ -310,7 +359,7 @@ export class HintScene extends Phaser.Scene {
         }
 
         // Khung "bàn gỗ" bên dưới để thả vào – asset board-wood
-        const dropPanelY = h / 2 + panelHeight * 0.18;
+        const dropPanelY = h / 2  + 40 + panelHeight * 0.18;
         // Bảng gỗ: hẹp hơn theo chiều ngang, cao hơn theo chiều dọc
         const dropWidth = panelWidth * 0.74;
         const dropHeight = panelHeight * 0.4;
@@ -581,4 +630,9 @@ export class HintScene extends Phaser.Scene {
         this.scene.stop('HintScene');
         this.scene.resume('LessonScene');
     }
+    public restartHint() {
+    AudioManager.stopAllExceptBgm();
+    this.scene.restart({ item: this.item, concept: this.concept });
+    }
+
 }
