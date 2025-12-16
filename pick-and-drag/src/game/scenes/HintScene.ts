@@ -238,8 +238,8 @@ export class HintScene extends Phaser.Scene {
 
             // scale để vừa trong banner
             if (bannerObj) {
-                const maxW = bannerObj.displayWidth * 1.55;
-                const maxH = bannerObj.displayHeight * 1.55;
+                const maxW = bannerObj.displayWidth * 1.3;
+                const maxH = bannerObj.displayHeight * 1.3;
 
                 const texW = img.width || 1;
                 const texH = img.height || 1;
