@@ -8,14 +8,21 @@
         lessonScene?: any;
         hintScene?: any;
 
-        // (tuỳ chọn) để debug / chia sẻ state
         __currentLesson?: any;
         __currentLessonId?: string;
         __lessonPool?: string[];
 
-        __lastResetAt?: number;
-
         game?: Phaser.Game;
+
+        // ✅ reset queue + locks
+        __resetInProgress?: boolean;
+        __resetQueue?: number;
+        __requestReset?: () => void;
+
+        __preloadRunning?: boolean;
+
+        // ✅ Phaser BGM reference (LessonScene.ensureBgm set vào window.phaserBgm)
+        phaserBgm?: Phaser.Sound.BaseSound | null;
     }
     }
 
@@ -93,20 +100,30 @@
     reset.style.display = 'none';
     }
 
-    // ✅ RESET: bấm là về PreloadScene để nó random lesson + load json lại
-    document.getElementById('btn-reset')?.addEventListener('click', () => {
+    // ✅ stop BGM của Phaser (AudioManager không stop được cái này)
+    function stopPhaserBgm() {
+    const bgm = window.phaserBgm;
+    if (!bgm) return;
+
+    try { bgm.stop(); } catch {}
+    try { bgm.destroy(); } catch {}
+
+    window.phaserBgm = null;
+    }
+
+    // ✅ reset core
+    function doReset() {
     const game = window.game;
     if (!game) return;
 
-    // chống double fire quá nhanh (touch/click)
-    const now = Date.now();
-    if (window.__lastResetAt && now - window.__lastResetAt < 120) return;
-    window.__lastResetAt = now;
+    window.__resetInProgress = true;
 
-    // dừng voice/sfx (giữ BGM tuỳ bạn)
-    try {
-        AudioManager.stopAllExceptBgm();
-    } catch {}
+    // ✅ stop tất cả âm (Howler)
+    try { AudioManager.stopAll?.(); } catch {}
+    try { AudioManager.stopAllExceptBgm?.(); } catch {}
+
+    // ✅ stop BGM Phaser
+    stopPhaserBgm();
 
     const sm = game.scene;
 
@@ -117,6 +134,30 @@
         if (s && s.scene?.isActive()) sm.stop(key);
     }
 
-    // ✅ quay về preload (PreloadScene sẽ pick random lessonId + load json)
+    // ✅ về preload (PreloadScene tự random lessonId + load)
     sm.start('PreloadScene');
+    }
+
+    // ✅ spam vẫn chạy: nếu đang reset hoặc đang preload -> xếp hàng
+    function requestReset() {
+    // đang chạy preload/load asset => đợi
+    if (window.__preloadRunning) {
+        window.__resetQueue = (window.__resetQueue ?? 0) + 1;
+        return;
+    }
+
+    // đang reset => xếp hàng
+    if (window.__resetInProgress) {
+        window.__resetQueue = (window.__resetQueue ?? 0) + 1;
+        return;
+    }
+
+    doReset();
+    }
+
+    window.__requestReset = requestReset;
+
+    // ✅ click handler
+    document.getElementById('btn-reset')?.addEventListener('click', () => {
+    requestReset();
     });

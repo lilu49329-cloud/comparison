@@ -19,22 +19,57 @@
 
         __currentLessonJsonKey?: string;
 
-        __howlerLoaded?: boolean;       // ✅ AudioManager.loadAll chỉ chạy 1 lần
-        __resetInProgress?: boolean;    // ✅ main set
-        __resetQueue?: number;          // ✅ main set
-        __requestReset?: () => void;    // ✅ main set
+        __howlerLoaded?: boolean;
+
+        __resetInProgress?: boolean; // main set
+        __resetQueue?: number; // main set
+        __requestReset?: () => void; // main set
+
+        __preloadRunning?: boolean; // ✅ khóa preload global
     }
     }
 
     export class PreloadScene extends Phaser.Scene {
     private lessonData!: LessonPackage;
 
+    // ✅ khóa theo instance để scene spam không chạy chồng
+    private myTurn = false;
+
     constructor() {
         super('PreloadScene');
     }
 
+    init() {
+        // ✅ nếu đang có preload khác chạy thì scene này "bỏ lượt"
+        if ((window as any).__preloadRunning) {
+        this.myTurn = false;
+        return;
+        }
+
+        this.myTurn = true;
+        (window as any).__preloadRunning = true;
+
+        // ✅ nếu scene bị stop/shutdown giữa chừng -> dọn cờ + dọn loader listener
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        if (!this.myTurn) return;
+
+        try {
+            this.load.removeAllListeners();
+            // @ts-ignore
+            if (typeof this.load.isLoading === 'function' && this.load.isLoading()) {
+            // @ts-ignore
+            this.load.reset();
+            }
+        } catch {}
+
+        (window as any).__preloadRunning = false;
+        });
+    }
+
     preload() {
-        // ===== UI (load 1 lần, Phaser tự cache theo key) =====
+        if (!this.myTurn) return;
+
+        // ===== UI (load 1 lần) =====
         if (!this.textures.exists('icon')) this.load.image('icon', 'assets/ui/icon.png');
 
         if (!this.textures.exists('panel_bg')) this.load.image('panel_bg', 'assets/ui/panel_bg.png');
@@ -66,12 +101,11 @@
         this.load.json('size_hint', 'hints/size_hint.json');
         }
 
-        // ✅ set pool (để debug / dùng chỗ khác)
+        // pool để debug
         (window as any).__lessonPool = LESSON_IDS.slice();
 
-        // ✅ chọn lessonId random (tránh trùng lesson vừa chơi nếu có thể)
+        // ✅ chọn lesson random (tránh trùng lesson vừa chơi)
         const prevId = (window as any).__currentLessonId as string | undefined;
-
         let picked = LESSON_IDS[Math.floor(Math.random() * LESSON_IDS.length)];
         if (LESSON_IDS.length > 1 && prevId) {
         for (let i = 0; i < 10; i++) {
@@ -79,10 +113,9 @@
             picked = LESSON_IDS[Math.floor(Math.random() * LESSON_IDS.length)];
         }
         }
-
         (window as any).__currentLessonId = picked;
 
-        // ✅ cache JSON theo key riêng từng lesson -> không cần remove/reload
+        // ✅ cache JSON theo key riêng
         const jsonKey = `lesson_${picked}`;
         (window as any).__currentLessonJsonKey = jsonKey;
 
@@ -90,20 +123,20 @@
         this.load.json(jsonKey, `lessons/${picked}.json`);
         }
 
-        // ===== AUDIO FILE (Phaser) (load 1 lần) =====
-        // NOTE: cache.audio.exists may not exist in some Phaser builds; fallback: just load, Phaser will ignore duplicates by key
+        // ===== AUDIO FILE (Phaser) =====
+        // (nếu cache audio không có exists thì cứ load; Phaser thường ignore duplicate key)
         try {
         // @ts-ignore
-        if (!(this.cache as any).audio?.exists?.('bgm_main')) {
-            this.load.audio('bgm_main', 'audio/sfx/bgm_main.mp3');
-        }
+        const has = (this.cache as any).audio?.exists?.('bgm_main');
+        if (!has) this.load.audio('bgm_main', 'audio/sfx/bgm_main.mp3');
         } catch {
-        // fallback: safe to call load.audio again; Phaser usually keeps last/ignores duplicates by key
         this.load.audio('bgm_main', 'audio/sfx/bgm_main.mp3');
         }
     }
 
     async create() {
+        if (!this.myTurn) return;
+
         const jsonKey = (window as any).__currentLessonJsonKey as string;
         const rawLesson = this.cache.json.get(jsonKey) as LessonPackage;
 
@@ -131,14 +164,14 @@
         (window as any).__currentLesson = lessonForPlay;
 
         try {
-        // ✅ Howler load 1 lần cho cả runtime
+        // ✅ Howler load 1 lần
         if (!(window as any).__howlerLoaded) {
             await AudioManager.loadAll();
             (window as any).__howlerLoaded = true;
         }
 
-        // ✅ load dynamic assets theo lesson (chỉ những cái chưa có)
-        await this.preloadDynamicAssets(lessonForPlay);
+        // ✅ load dynamic assets an toàn
+        await this.preloadDynamicAssetsSafe(lessonForPlay);
 
         this.lessonData = lessonForPlay;
         this.scene.start('LessonScene', { lesson: this.lessonData });
@@ -146,9 +179,11 @@
         console.error('PreloadScene error:', e);
         this.scene.start('LessonScene', { lesson: lessonForPlay });
         } finally {
+        // ✅ nhả lock preload (chỉ nhả nếu scene này là chủ)
+        if (this.myTurn) (window as any).__preloadRunning = false;
+
         // ✅ nhả reset lock + chạy tiếp queue nếu user spam
         (window as any).__resetInProgress = false;
-
         const q = (window as any).__resetQueue ?? 0;
         if (q > 0) {
             (window as any).__resetQueue = q - 1;
@@ -157,8 +192,10 @@
         }
     }
 
-    // ===== LOAD ẢNH ĐỘNG THEO LESSON =====
-    private preloadDynamicAssets(lesson: LessonPackage) {
+    // ✅ dynamic loader an toàn (không dựa totalToLoad)
+    private preloadDynamicAssetsSafe(lesson: LessonPackage) {
+        const before = (this.load as any).list?.size ?? 0;
+
         lesson.items.forEach((item: any) => {
         if (item.promptImage && !this.textures.exists(item.promptImage)) {
             this.load.image(item.promptImage, item.promptImage);
@@ -179,11 +216,20 @@
         });
         }
 
-        if (this.load.totalToLoad === 0) return Promise.resolve();
+        const after = (this.load as any).list?.size ?? 0;
+        if (after <= before) return Promise.resolve();
 
         return new Promise<void>((resolve) => {
-        this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
-        this.load.start();
+        const onComplete = () => {
+            this.load.off(Phaser.Loader.Events.COMPLETE, onComplete);
+            resolve();
+        };
+
+        this.load.once(Phaser.Loader.Events.COMPLETE, onComplete);
+
+        // @ts-ignore
+        const isLoading = typeof this.load.isLoading === 'function' ? this.load.isLoading() : false;
+        if (!isLoading) this.load.start();
         });
     }
     }

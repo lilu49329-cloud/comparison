@@ -61,7 +61,7 @@
     init(data: { lesson: LessonPackage }) {
         (window as any).__currentLesson = data.lesson;
         console.log('POOL size', window.__lessonPool?.length);
-        
+    
 
 
         this.lesson = data.lesson;
@@ -294,6 +294,8 @@
         }
 
         showGameButtons();
+        (window as any).__preloadRunning = false;
+
     }
 
     // ===== Hiển thị 1 câu hỏi =====
