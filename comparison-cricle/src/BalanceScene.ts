@@ -4,6 +4,7 @@ import AudioManager from './AudioManager';
 import { resetRotateVoiceLock, playVoiceLocked } from './rotateOrientation';
 
 type Subject = 'BALL' | 'CAKE';
+type Side = 'LEFT' | 'RIGHT';
 
 /* ===================== ASSET MAP ===================== */
 
@@ -45,10 +46,45 @@ const DRAG_TEXTURES: Record<Subject, string[]> = {
   CAKE: ['icon1'],
 };
 
-
-
 const RESULT_STAMP_MARGIN = 28;
 const RESULT_STAMP_SIZE = 72;
+
+/* ===================== DROP TARGET (TAY CHÚ HỀ + ĐĨA BÁNH) ===================== */
+/**
+ * ax/ay là tỉ lệ trong sprite:
+ * ax=0 mép trái, ax=1 mép phải
+ * ay=0 mép trên, ay=1 mép dưới
+ *
+ * 👇 Bạn chỉnh các số này để đúng CHÍNH XÁC cánh tay & tâm đĩa
+ */
+const DROP_ANCHOR = {
+  BALL: {
+    LEFT: { ax: 0.38, ay: 0.38 }, // cánh tay chú hề trái (ball1)
+    RIGHT: { ax: 0.8, ay: 0.38 }, // cánh tay chú hề phải (ball2)
+  },
+  CAKE: { ax: 0.8, ay: 0.3 }, // tâm đĩa bánh (cake)
+} as const;
+
+// Vùng nhận thả dạng ellipse (tay/đĩa thường không tròn hoàn hảo)
+function getDropEllipseR(screenH: number, subject: Subject) {
+  const k = screenH / 720;
+  if (subject === 'BALL') return { rx: 55 * k, ry: 130 * k }; // RỘNG hơn
+  return { rx: 130 * k, ry: 55 * k }; // BALL: DÀI ngang theo tay
+}
+
+function anchorToWorld(base: Phaser.GameObjects.Image, ax: number, ay: number) {
+  // base origin đang 0.5,0.5 -> quy đổi anchor -> world
+  return {
+    x: base.x + (ax - 0.5) * base.displayWidth,
+    y: base.y + (ay - 0.5) * base.displayHeight,
+  };
+}
+
+function inEllipse(x: number, y: number, cx: number, cy: number, rx: number, ry: number) {
+  const dx = x - cx;
+  const dy = y - cy;
+  return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
+}
 
 /* ===================== TYPES ===================== */
 
@@ -76,6 +112,10 @@ export default class BalanceScene extends Phaser.Scene {
   private rightBase?: Phaser.GameObjects.Image;
   private singleBase?: Phaser.GameObjects.Image;
 
+  // ✅ CÁCH 2: lưu display size gốc của cake để cake_plus không “nhảy”
+  private cakeBaseDisplayW = 0;
+  private cakeBaseDisplayH = 0;
+
   private upgradeCharacter: 'BALL1' | 'BALL2' = 'BALL1';
   private nextSceneKey = 'GameScene';
   public score = 0;
@@ -100,6 +140,10 @@ export default class BalanceScene extends Phaser.Scene {
     this.levelIndex = data.levelIndex ?? 0;
 
     this.draggedIconCodes = [];
+
+    // reset size cache mỗi lần vào scene
+    this.cakeBaseDisplayW = 0;
+    this.cakeBaseDisplayH = 0;
   }
 
   /* ===================== APPLY BALL2 UPGRADE ===================== */
@@ -164,6 +208,9 @@ export default class BalanceScene extends Phaser.Scene {
     const { width, height } = this.scale;
     resetRotateVoiceLock();
     this.input.setDefaultCursor('default');
+
+    // ✅ chống “tap nhẹ” bị coi như drag ngay (mobile)
+    this.input.dragDistanceThreshold = 10;
 
     /* ===================== CHAR NỀN (giống GameScene) ===================== */
     const baseCornerCharScale = height / 720;
@@ -235,12 +282,7 @@ export default class BalanceScene extends Phaser.Scene {
     const panelH = panel.displayHeight;
 
     // ✅ rect của panel để kiểm tra thả trong vùng hợp lệ
-    const panelRect = new Phaser.Geom.Rectangle(
-      panel.x - panelW / 2,
-      panel.y - panelH / 2,
-      panelW,
-      panelH
-    );
+    const panelRect = new Phaser.Geom.Rectangle(panel.x - panelW / 2, panel.y - panelH / 2, panelW, panelH);
 
     this.centerActorX = panel.x;
     this.leftActorCenterX = panel.x - panelW * 0.22;
@@ -271,28 +313,41 @@ export default class BalanceScene extends Phaser.Scene {
           (panelW * 0.25) / Math.max(texL.width, texR.width)
         ) * 1.7;
 
-      this.leftBase = this.add
-        .image(this.leftActorCenterX, this.actorY, 'ball1')
-        .setScale(charScale)
-        .setOrigin(0.5);
-
-      this.rightBase = this.add
-        .image(this.rightActorCenterX, this.actorY, 'ball2')
-        .setScale(charScale)
-        .setOrigin(0.5);
+      this.leftBase = this.add.image(this.leftActorCenterX, this.actorY, 'ball1').setScale(charScale).setOrigin(0.5);
+      this.rightBase = this.add.image(this.rightActorCenterX, this.actorY, 'ball2').setScale(charScale).setOrigin(0.5);
     }
 
     if (this.subject === 'CAKE') {
       const tex = this.textures.get('cake').getSourceImage() as HTMLImageElement;
 
-      charScale =
-        Math.min((panelH * 0.6) / tex.height, (panelW * 0.3) / tex.width) * 2.5;
+      charScale = Math.min((panelH * 0.6) / tex.height, (panelW * 0.3) / tex.width) * 2.5;
 
-      this.singleBase = this.add
-        .image(this.centerActorX, this.actorY, 'cake')
-        .setScale(charScale)
-        .setOrigin(0.5);
+      this.singleBase = this.add.image(this.centerActorX, this.actorY, 'cake').setScale(charScale).setOrigin(0.5);
+
+      // ✅ lưu display size sau khi setScale (đây là size “đúng” bạn muốn giữ)
+      this.cakeBaseDisplayW = this.singleBase.displayWidth;
+      this.cakeBaseDisplayH = this.singleBase.displayHeight;
     }
+
+    /* ===================== DROP TARGET HELPER ===================== */
+
+    const { rx, ry } = getDropEllipseR(height, this.subject);
+
+    const getDropTarget = () => {
+      if (this.subject === 'BALL') {
+        const side: Side = this.upgradeCharacter === 'BALL1' ? 'LEFT' : 'RIGHT';
+        const base = side === 'LEFT' ? this.leftBase : this.rightBase;
+        if (!base) return null;
+
+        const a = DROP_ANCHOR.BALL[side];
+        return anchorToWorld(base, a.ax, a.ay);
+      }
+
+      // CAKE: target đúng tâm đĩa
+      const base = this.singleBase;
+      if (!base) return null;
+      return anchorToWorld(base, DROP_ANCHOR.CAKE.ax, DROP_ANCHOR.CAKE.ay);
+    };
 
     /* ===================== ICON KÉO ===================== */
 
@@ -307,9 +362,7 @@ export default class BalanceScene extends Phaser.Scene {
     const startX = panel.x - ((dragCount - 1) * spacingX) / 2;
 
     for (let i = 0; i < dragCount; i++) {
-      const dragKey =
-        this.subject === 'BALL' ? DRAG_TEXTURES.BALL[i] : DRAG_TEXTURES.CAKE[0];
-
+      const dragKey = this.subject === 'BALL' ? DRAG_TEXTURES.BALL[i] : DRAG_TEXTURES.CAKE[0];
       const iconX = startX + i * spacingX;
 
       const icon = this.add
@@ -331,24 +384,24 @@ export default class BalanceScene extends Phaser.Scene {
       });
 
       icon.on('dragend', async () => {
-        // ✅ CHỈ CẦN THẢ ĐÚNG BÊN (không cần đúng vùng "tay" nữa)
+        // ✅ BẮT BUỘC: thả đúng "tay chú hề" / "tâm đĩa bánh" + trong panel
+        const homeX = iconX;
+        const homeY = dragY;
+
         const inPanel = Phaser.Geom.Rectangle.Contains(panelRect, icon.x, icon.y);
-        const midX = panel.x;
+        const target = getDropTarget();
 
         let isCorrectDrop = false;
 
-        if (this.subject === 'BALL') {
-          const droppedSide: 'LEFT' | 'RIGHT' = icon.x < midX ? 'LEFT' : 'RIGHT';
-          const needSide: 'LEFT' | 'RIGHT' =
-            this.upgradeCharacter === 'BALL1' ? 'LEFT' : 'RIGHT';
+        if (target) {
+          const inTarget = inEllipse(icon.x, icon.y, target.x, target.y, rx, ry);
+          isCorrectDrop = inPanel && inTarget;
 
-          isCorrectDrop = inPanel && droppedSide === needSide;
-        } else {
-          // ✅ CAKE: thả bên PHẢI (nửa phải panel) mới đúng
-          const droppedSide: 'LEFT' | 'RIGHT' = icon.x < midX ? 'LEFT' : 'RIGHT';
-          isCorrectDrop = inPanel && droppedSide === 'RIGHT';
+          // ✅ giữ logic cũ: CAKE vẫn phải thả nửa phải panel
+          if (isCorrectDrop && this.subject === 'CAKE') {
+            isCorrectDrop = icon.x >= panel.x;
+          }
         }
-
 
         if (isCorrectDrop) {
           AudioManager.play('sfx_correct');
@@ -380,7 +433,15 @@ export default class BalanceScene extends Phaser.Scene {
           }
 
           if (this.subject === 'CAKE') {
-            this.singleBase?.setTexture(CHARACTER_UPGRADE_TEXTURE.CAKE.single);
+            const base = this.singleBase;
+            if (base) {
+              // ✅ CÁCH 2: đổi texture nhưng giữ nguyên display size của cake gốc
+              base.setTexture(CHARACTER_UPGRADE_TEXTURE.CAKE.single);
+              if (this.cakeBaseDisplayW > 0 && this.cakeBaseDisplayH > 0) {
+                base.setDisplaySize(this.cakeBaseDisplayW, this.cakeBaseDisplayH);
+              }
+            }
+
             if (addedCount === needAdd) {
               this.time.delayedCall(200, () => this.finishLevel());
             }
@@ -389,7 +450,7 @@ export default class BalanceScene extends Phaser.Scene {
           AudioManager.play('sfx_wrong');
           this.showResultStamp('answer_wrong');
           this.time.delayedCall(500, () => this.hideResultStamp());
-          icon.setPosition(iconX, dragY);
+          icon.setPosition(homeX, homeY); // ✅ thả lệch tay/đĩa là fail
         }
       });
     }

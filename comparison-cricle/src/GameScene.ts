@@ -34,6 +34,17 @@ type LevelConfig =
       correctSide: Side;
     });
 
+/* ===================== MORE / LESS HELPER ===================== */
+
+type QKind = 'MORE' | 'LESS';
+
+// Quy về MORE/LESS theo count thật của bên đúng
+function getQuestionKind(lv: LevelConfig): QKind {
+  const correctCount = lv.correctSide === 'LEFT' ? lv.leftCount : lv.rightCount;
+  const wrongCount = lv.correctSide === 'LEFT' ? lv.rightCount : lv.leftCount;
+  return correctCount > wrongCount ? 'MORE' : 'LESS';
+}
+
 // ===== SCALE =====
 const BOARD_SCALE = 0.88;
 
@@ -74,11 +85,58 @@ const LINE_WIDTH = 8;
 const MIN_SHAPE_AREA_RATIO = 0.05;
 const MID_DEADZONE_RATIO = 0.06; // vùng giữa không tính đúng (ép bé chọn trái/phải rõ ràng)
 const MID_DEADZONE_MIN_PX = 30;
-// const SIDE_DOMINANCE = 0.7;
-// const MIN_AREA = 2000;
-// const MAX_AREA_RATIO = 0.92;
+
+// ===== NEW RULES =====
+const DRAW_INSET = Math.ceil(LINE_WIDTH / 2) + 2; // không cho nét chạm viền
+const SMOOTH_STEP_PX = 2.5; // càng nhỏ càng mượt
+const MIN_POINTS = 12; // chống "chấm 1 cái"
+const MIN_PATH_LENGTH = 120; // chống "chấm 1 cái"
+
+// ✅ khoanh quá to -> sai (đang dùng 0.38 theo bạn)
+const MAX_BBOX_BOARD_AREA_RATIO = 0.38;
+
+// ✅ giữ constant cũ làm fallback để không phá logic hiện tại
+const MIN_TARGET_COVERAGE = 0.7; // fallback
+
+// ✅ coverage theo subject (baseline)
+const MIN_TARGET_COVERAGE_BY_SUBJECT: Record<Subject, number> = {
+  BALL: 0.45,
+  CAKE: 0.35,
+};
+
+// ✅ phạt nếu ellipse ăn sang vùng SAI quá nhiều
+const MAX_WRONG_COVERAGE_BY_SUBJECT: Record<Subject, number> = {
+  BALL: 0.15,
+  CAKE: 0.2,
+};
+
+const CORRECT_SIDE_RATIO = 0.6; // đúng/sai theo 60/40 của board
+
+// ===== CAKE RULES BY QUESTION KIND =====
+// LESS: cho khoanh nhỏ (khoanh 2 bánh vẫn OK)
+// MORE: bắt khoanh to (khoanh 2 bánh sẽ FAIL)
+const CAKE_RULES: Record<QKind, { minAreaRatio: number; minCoverage: number }> = {
+  LESS: { minAreaRatio: 0.18, minCoverage: 0.35 },
+  MORE: { minAreaRatio: 0.55, minCoverage: 0.55 },
+};
+
+// ===== ONE_ASSET TARGET ZONE (CAKE) =====
+type NormRect = { x: number; y: number; w: number; h: number };
+
+// ✅ canh theo cake.png bạn gửi
+const ONE_ASSET_TARGET_NORM: Partial<Record<Subject, Record<Side, NormRect>>> = {
+  CAKE: {
+    LEFT: { x: 0.02, y: 0.18, w: 0.46, h: 0.48 },
+    RIGHT: { x: 0.52, y: 0.18, w: 0.46, h: 0.48 },
+  },
+};
+
+// ✅ nếu bé khoanh “mơ hồ” chạm cả 2 đĩa ngang nhau quá -> fail để ép khoanh rõ
+const ONE_ASSET_AMBIGUOUS_MARGIN = 0.1;
 
 type SnapData = { cx: number; cy: number; w: number; h: number };
+
+const oppositeSide = (s: Side): Side => (s === 'LEFT' ? 'RIGHT' : 'LEFT');
 
 export default class GameScene extends Phaser.Scene {
   public levelIndex = 0;
@@ -96,6 +154,10 @@ export default class GameScene extends Phaser.Scene {
   private boardImageRight!: Phaser.GameObjects.Image;
 
   private boardRect!: Phaser.Geom.Rectangle;
+
+  // ✅ vùng cho phép vẽ (inset) + mask để cắt nét
+  private boardDrawRect!: Phaser.Geom.Rectangle;
+  private drawMask?: Phaser.Display.Masks.GeometryMask;
 
   private drawGraphics!: Phaser.GameObjects.Graphics;
   private isDrawing = false;
@@ -135,6 +197,27 @@ export default class GameScene extends Phaser.Scene {
 
     const maxScale = Math.min(targetW / iw, targetH / ih);
     img.setScale(maxScale * padding);
+  }
+
+  // ===== ONE_ASSET TARGET RECT =====
+  private getOneAssetTargetRect(lv: LevelConfig, side: Side): Phaser.Geom.Rectangle {
+    const b = this.boardImageSingle.getBounds();
+    const norm = ONE_ASSET_TARGET_NORM[lv.subject]?.[side];
+
+    // fallback: chia 50/50 như cũ
+    if (!norm) {
+      const halfW = b.width / 2;
+      return side === 'LEFT'
+        ? new Phaser.Geom.Rectangle(b.x, b.y, halfW, b.height)
+        : new Phaser.Geom.Rectangle(b.x + halfW, b.y, halfW, b.height);
+    }
+
+    return new Phaser.Geom.Rectangle(
+      b.x + norm.x * b.width,
+      b.y + norm.y * b.height,
+      norm.w * b.width,
+      norm.h * b.height
+    );
   }
 
   // ===== SNAP ELLIPSE =====
@@ -287,7 +370,7 @@ export default class GameScene extends Phaser.Scene {
     setBtnBgFromUrl(replayBtnEl, 'assets/button/replay.png');
     setBtnBgFromUrl(nextBtnEl, 'assets/button/next.png');
 
-    // BOARD frame (dịch nhẹ sang phải để cân với char bên trái)
+    // BOARD frame
     const boardX = (width - BOARD_WIDTH) / 2 + width * 0.01;
     const boardY = BOARD_TOP_Y;
 
@@ -317,6 +400,14 @@ export default class GameScene extends Phaser.Scene {
     // Rect vùng board
     this.boardRect = new Phaser.Geom.Rectangle(boardX, boardY, BOARD_WIDTH, BOARD_HEIGHT);
 
+    // ✅ Rect cho phép vẽ (inset)
+    this.boardDrawRect = new Phaser.Geom.Rectangle(
+      boardX + DRAW_INSET,
+      boardY + DRAW_INSET,
+      BOARD_WIDTH - DRAW_INSET * 2,
+      BOARD_HEIGHT - DRAW_INSET * 2
+    );
+
     // Stamp đúng/sai
     const stampX = boardX + BOARD_WIDTH - RESULT_STAMP_MARGIN;
     const stampY = boardY + BOARD_HEIGHT - RESULT_STAMP_MARGIN;
@@ -345,7 +436,6 @@ export default class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-
     // Feedback
     this.feedbackText = this.add
       .text(width / 2, height - FEEDBACK_BOTTOM_MARGIN, '', {
@@ -357,6 +447,22 @@ export default class GameScene extends Phaser.Scene {
     // Lớp vẽ
     this.drawGraphics = this.add.graphics().setDepth(10);
 
+    // ✅ Mask cắt nét trong boardDrawRect
+    const maskGfx = this.make.graphics({ x: 0, y: 0 });
+    maskGfx.setVisible(false);
+    maskGfx.setActive(false);
+
+    maskGfx.fillStyle(0xffffff, 1);
+    maskGfx.fillRect(
+      this.boardDrawRect.x,
+      this.boardDrawRect.y,
+      this.boardDrawRect.width,
+      this.boardDrawRect.height
+    );
+
+    this.drawMask = maskGfx.createGeometryMask();
+    this.drawGraphics.setMask(this.drawMask);
+
     this.input.on('pointerdown', this.handleDrawStart, this);
     this.input.on('pointermove', this.handleDrawMove, this);
     this.input.on('pointerup', this.handleDrawEnd, this);
@@ -364,7 +470,7 @@ export default class GameScene extends Phaser.Scene {
 
     (window as any).playCurrentQuestionVoice = () => this.playCurrentQuestionVoice();
 
-    // ===== NHÂN VẬT NỀN (CHAR) – neo theo viewport, không phụ thuộc board =====
+    // ===== CHAR nền =====
     const baseCharScale = height / 720;
     const charScale = baseCharScale * 0.55;
     const charX = width * 0.1;
@@ -376,7 +482,6 @@ export default class GameScene extends Phaser.Scene {
       .setScale(charScale)
       .setDepth(15);
 
-    // Nhún + lắc nhẹ (giống Match12)
     this.tweens.add({
       targets: this.cornerCharacter,
       y: charY - height * 0.02,
@@ -476,13 +581,10 @@ export default class GameScene extends Phaser.Scene {
 
     const bannerCenterX = this.questionBanner.x;
     const bannerCenterY = this.questionBanner.y;
-    const bannerTextScale = 0.65; // scale nhỏ ảnh text trong banner
+    const bannerTextScale = 0.65;
 
     if (lv.bannerImageKey && this.textures.exists(lv.bannerImageKey)) {
-      // Luôn tạo lại promptImage để tránh dùng object đã bị destroy giữa các lần restart scene
-      if (this.promptImage) {
-        this.promptImage.destroy();
-      }
+      if (this.promptImage) this.promptImage.destroy();
 
       this.promptImage = this.add
         .image(bannerCenterX, bannerCenterY, lv.bannerImageKey)
@@ -500,10 +602,7 @@ export default class GameScene extends Phaser.Scene {
       const scaleY = BANNER_SCALE * BOARD_SCALE;
       this.questionBanner.setScale(scaleX, scaleY);
     } else {
-      // Fallback: dùng text nếu chưa có asset ảnh
-      if (this.promptImage) {
-        this.promptImage.setVisible(false);
-      }
+      if (this.promptImage) this.promptImage.setVisible(false);
 
       this.promptText.setVisible(true);
       this.promptText.setText(lv.questionText);
@@ -517,12 +616,12 @@ export default class GameScene extends Phaser.Scene {
       const scaleY = BANNER_SCALE * BOARD_SCALE;
       this.questionBanner.setScale(scaleX, scaleY);
     }
+
     this.playCurrentQuestionVoice();
   }
 
   private launchBalanceForLevel(lv: LevelConfig) {
-    const lessCharacter: 'GIRL' | 'BOY' =
-      lv.leftCount < lv.rightCount ? 'GIRL' : 'BOY';
+    const lessCharacter: 'GIRL' | 'BOY' = lv.leftCount < lv.rightCount ? 'GIRL' : 'BOY';
 
     this.scene.start('BalanceScene', {
       leftCount: lv.leftCount,
@@ -541,11 +640,93 @@ export default class GameScene extends Phaser.Scene {
     if (!voiceKey) return;
 
     try {
-      // Khoá voice câu hỏi: nếu đang phát thì không phát lại
       if (AudioManager.isPlaying(voiceKey)) return;
       AudioManager.play(voiceKey);
     } catch {
       // ignore
+    }
+  }
+
+  // ================== HELPERS ==================
+  private getCorrectTargetRect(lv: LevelConfig): Phaser.Geom.Rectangle {
+    if (lv.kind === 'TWO_ASSETS') {
+      return lv.correctSide === 'LEFT'
+        ? this.boardImageLeft.getBounds()
+        : this.boardImageRight.getBounds();
+    }
+
+    // ✅ ONE_ASSET: dùng target zone theo đĩa thật
+    return this.getOneAssetTargetRect(lv, lv.correctSide);
+  }
+
+  private getWrongTargetRect(lv: LevelConfig): Phaser.Geom.Rectangle {
+    if (lv.kind === 'TWO_ASSETS') {
+      return lv.correctSide === 'LEFT'
+        ? this.boardImageRight.getBounds()
+        : this.boardImageLeft.getBounds();
+    }
+
+    return this.getOneAssetTargetRect(lv, oppositeSide(lv.correctSide));
+  }
+
+  private ellipseCoversTargetRatio(snap: SnapData, target: Phaser.Geom.Rectangle, grid = 7) {
+    const rx = Math.max(1, snap.w / 2);
+    const ry = Math.max(1, snap.h / 2);
+
+    let inside = 0;
+    const total = grid * grid;
+
+    for (let i = 0; i < grid; i++) {
+      for (let j = 0; j < grid; j++) {
+        const x = target.x + ((i + 0.5) * target.width) / grid;
+        const y = target.y + ((j + 0.5) * target.height) / grid;
+
+        const dx = (x - snap.cx) / rx;
+        const dy = (y - snap.cy) / ry;
+
+        if (dx * dx + dy * dy <= 1) inside++;
+      }
+    }
+
+    return inside / total;
+  }
+
+  // đúng/sai theo 60/40 của BOARD
+  private isCorrectSide60_40(lv: LevelConfig, cx: number): boolean {
+    const x0 = this.boardRect.x;
+    const w = this.boardRect.width;
+
+    if (lv.correctSide === 'LEFT') {
+      return cx <= x0 + w * CORRECT_SIDE_RATIO; // <= 60%
+    }
+    return cx >= x0 + w * (1 - CORRECT_SIDE_RATIO); // >= 40%
+  }
+
+  // vẽ mượt
+  private drawSmoothSegment(from: Phaser.Math.Vector2, toX: number, toY: number) {
+    const dist = Phaser.Math.Distance.Between(from.x, from.y, toX, toY);
+    const steps = Math.max(1, Math.ceil(dist / SMOOTH_STEP_PX));
+
+    let prevX = from.x;
+    let prevY = from.y;
+
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const x = Phaser.Math.Linear(from.x, toX, t);
+      const y = Phaser.Math.Linear(from.y, toY, t);
+
+      this.drawGraphics.lineStyle(LINE_WIDTH, LINE_COLOR, 1);
+      this.drawGraphics.beginPath();
+      this.drawGraphics.moveTo(prevX, prevY);
+      this.drawGraphics.lineTo(x, y);
+      this.drawGraphics.strokePath();
+
+      this.drawGraphics.fillStyle(LINE_COLOR, 1);
+      this.drawGraphics.fillCircle(x, y, LINE_WIDTH / 2);
+
+      this.drawPoints.push(new Phaser.Math.Vector2(x, y));
+      prevX = x;
+      prevY = y;
     }
   }
 
@@ -554,21 +735,18 @@ export default class GameScene extends Phaser.Scene {
     if (this.gameState !== 'WAIT_CHOICE') return;
 
     const insideBoard = Phaser.Geom.Rectangle.Contains(
-      this.boardRect,
+      this.boardDrawRect,
       pointer.worldX,
       pointer.worldY
     );
-    // Chỉ cho bắt đầu khoanh khi nằm trong board
+
     if (!insideBoard) {
       this.input.setDefaultCursor('default');
       return;
     }
 
-    // Ngắt âm thanh câu hỏi nếu đang phát khi bé bắt đầu khoanh
     const lv = this.levels[this.levelIndex];
-    if (lv?.voiceKey) {
-      AudioManager.stop(lv.voiceKey);
-    }
+    if (lv?.voiceKey) AudioManager.stop(lv.voiceKey);
 
     this.hideResultStamp();
     this.clearSnapEllipse();
@@ -579,8 +757,9 @@ export default class GameScene extends Phaser.Scene {
 
     this.drawGraphics.clear();
     this.drawGraphics.lineStyle(LINE_WIDTH, LINE_COLOR, 1);
-    this.drawGraphics.beginPath();
-    this.drawGraphics.moveTo(pointer.worldX, pointer.worldY);
+
+    this.drawGraphics.fillStyle(LINE_COLOR, 1);
+    this.drawGraphics.fillCircle(pointer.worldX, pointer.worldY, LINE_WIDTH / 2);
 
     this.drawPoints.push(new Phaser.Math.Vector2(pointer.worldX, pointer.worldY));
 
@@ -593,22 +772,16 @@ export default class GameScene extends Phaser.Scene {
     const x = pointer.worldX;
     const y = pointer.worldY;
 
-    // Khi đang khoanh mà đi ra ngoài board → không vẽ nét, đánh dấu đã ra ngoài
-    if (!Phaser.Geom.Rectangle.Contains(this.boardRect, x, y)) {
+    if (!Phaser.Geom.Rectangle.Contains(this.boardDrawRect, x, y)) {
       this.hasDrawnOutsideBoard = true;
       this.input.setDefaultCursor('default');
       return;
     }
 
     const last = this.drawPoints[this.drawPoints.length - 1];
-    if (last && Phaser.Math.Distance.Between(last.x, last.y, x, y) < 6) return;
+    if (!last) return;
 
-    this.drawGraphics.lineTo(x, y);
-    this.drawGraphics.strokePath();
-    this.drawGraphics.beginPath();
-    this.drawGraphics.moveTo(x, y);
-
-    this.drawPoints.push(new Phaser.Math.Vector2(x, y));
+    this.drawSmoothSegment(last, x, y);
   }
 
   private handleDrawEnd() {
@@ -617,7 +790,24 @@ export default class GameScene extends Phaser.Scene {
 
     this.input.setDefaultCursor('default');
 
-    // bbox
+    if (this.drawPoints.length < MIN_POINTS) {
+      this.drawGraphics.clear();
+      this.failAttempt();
+      return;
+    }
+
+    let pathLen = 0;
+    for (let i = 1; i < this.drawPoints.length; i++) {
+      const a = this.drawPoints[i - 1];
+      const b = this.drawPoints[i];
+      pathLen += Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
+    }
+    if (pathLen < MIN_PATH_LENGTH) {
+      this.drawGraphics.clear();
+      this.failAttempt();
+      return;
+    }
+
     let minX = Infinity,
       maxX = -Infinity,
       minY = Infinity,
@@ -633,9 +823,17 @@ export default class GameScene extends Phaser.Scene {
     const w = maxX - minX;
     const h = maxY - minY;
 
-    // ✅ khoanh ra ngoài board: SAI ngay
+    // ✅ dùng boardDrawRect area (đúng với vùng bé được phép vẽ)
+    const boardArea = this.boardDrawRect.width * this.boardDrawRect.height;
+    const bboxArea = w * h;
+    if (boardArea > 0 && bboxArea / boardArea > MAX_BBOX_BOARD_AREA_RATIO) {
+      this.drawGraphics.clear();
+      this.failAttempt();
+      return;
+    }
+
     const anyOutsideInPoints = this.drawPoints.some(
-      (p) => !Phaser.Geom.Rectangle.Contains(this.boardRect, p.x, p.y)
+      (p) => !Phaser.Geom.Rectangle.Contains(this.boardDrawRect, p.x, p.y)
     );
     const anyOutside = this.hasDrawnOutsideBoard || anyOutsideInPoints;
     if (anyOutside) {
@@ -647,13 +845,13 @@ export default class GameScene extends Phaser.Scene {
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
 
-    if (!Phaser.Geom.Rectangle.Contains(this.boardRect, cx, cy)) {
+    if (!Phaser.Geom.Rectangle.Contains(this.boardDrawRect, cx, cy)) {
       this.drawGraphics.clear();
       this.failAttempt();
       return;
     }
 
-    // Hình phải có diện tích đủ lớn (tránh đường thẳng hoặc gần như đường thẳng)
+    // Hình phải có diện tích đủ lớn
     let area = 0;
     for (let i = 0; i < this.drawPoints.length; i++) {
       const p1 = this.drawPoints[i];
@@ -661,37 +859,67 @@ export default class GameScene extends Phaser.Scene {
       area += p1.x * p2.y - p2.x * p1.y;
     }
     area = Math.abs(area) * 0.5;
-    const bboxArea = w * h;
     if (bboxArea > 0 && area / bboxArea < MIN_SHAPE_AREA_RATIO) {
-      // Diện tích quá nhỏ so với khung → coi như đường thẳng, không chấp nhận
       this.drawGraphics.clear();
       this.failAttempt();
       return;
     }
 
-    // Đơn giản hoá logic chọn bên:
-    // - Không khoanh ra ngoài bg (đã check ở trên)
-    // - Không yêu cầu diện tích / tỉ lệ quá chặt
-    // - Bé khoanh hơi méo vẫn tính là đúng, chỉ cần không là đường thẳng
+    const lv = this.levels[this.levelIndex];
+    const leftEdge = cx - w / 2;
+    const rightEdge = cx + w / 2;
 
-    const midX = this.boardRect.x + this.boardRect.width / 2;
-    const deadZone = Math.max(
-      MID_DEADZONE_MIN_PX,
-      this.boardRect.width * MID_DEADZONE_RATIO
-    );
+    let side: Side;
 
-    // ✅ khoanh ngay giữa (không nghiêng trái/phải) thì tính SAI
-    if (Math.abs(cx - midX) < deadZone) {
-      this.drawGraphics.clear();
-      this.failAttempt();
-      return;
+    if (lv.kind === 'ONE_ASSET') {
+      // ✅ cấm ellipse cắt qua đường giữa của ảnh (đỡ khoanh ăn cả 2 đĩa)
+      const midX = this.boardImageSingle.getBounds().centerX;
+      if (leftEdge < midX && rightEdge > midX) {
+        this.drawGraphics.clear();
+        this.failAttempt();
+        return;
+      }
+
+      const snap: SnapData = { cx, cy, w, h };
+
+      const leftT = this.getOneAssetTargetRect(lv, 'LEFT');
+      const rightT = this.getOneAssetTargetRect(lv, 'RIGHT');
+
+      const coverL = this.ellipseCoversTargetRatio(snap, leftT, 7);
+      const coverR = this.ellipseCoversTargetRatio(snap, rightT, 7);
+
+      // khoanh mơ hồ chạm cả 2 gần ngang nhau -> fail
+      if (Math.abs(coverL - coverR) < ONE_ASSET_AMBIGUOUS_MARGIN) {
+        this.drawGraphics.clear();
+        this.failAttempt();
+        return;
+      }
+
+      side = coverL > coverR ? 'LEFT' : 'RIGHT';
+    } else {
+      // TWO_ASSETS: midline + deadzone
+      const l = this.boardImageLeft.getBounds().centerX;
+      const r = this.boardImageRight.getBounds().centerX;
+      const midX = (l + r) / 2;
+
+      const deadZone = Math.max(MID_DEADZONE_MIN_PX, this.boardRect.width * MID_DEADZONE_RATIO);
+      if (Math.abs(cx - midX) < deadZone) {
+        this.drawGraphics.clear();
+        this.failAttempt();
+        return;
+      }
+
+      // ✅ cấm ellipse vắt qua midline => khoanh cả 2
+      if (leftEdge < midX && rightEdge > midX) {
+        this.drawGraphics.clear();
+        this.failAttempt();
+        return;
+      }
+
+      side = cx < midX ? 'LEFT' : 'RIGHT';
     }
-    const side: Side = cx < midX ? 'LEFT' : 'RIGHT';
 
-    // ✅ khoá state (tránh vẽ tiếp)
     this.gameState = 'CHECK_CHOICE';
-
-    // ✅ KHÔNG SNAP Ở ĐÂY NỮA (chỉ đúng mới snap)
     this.drawGraphics.clear();
 
     this.handleChoice(side, { cx, cy, w, h });
@@ -705,26 +933,79 @@ export default class GameScene extends Phaser.Scene {
     this.gameState = 'CHECK_CHOICE';
 
     const lv = this.levels[this.levelIndex];
-    const isCorrect = side === lv.correctSide;
 
-    if (isCorrect) {
-      // ✅ chỉ đúng mới snap ellipse
-      if (snap) this.showSnapEllipse(snap.cx, snap.cy, snap.w, snap.h);
+    let cx =
+      snap?.cx ??
+      (side === 'LEFT'
+        ? this.boardRect.x + this.boardRect.width * 0.25
+        : this.boardRect.x + this.boardRect.width * 0.75);
 
-      this.showResultStamp('answer_correct');
-      this.score++;
-      this.subgameDone = true;
-
-      AudioManager.play('sfx_correct');
-      AudioManager.playCorrectAnswer?.();
-
-      this.gameState = 'LEVEL_END';
-
-      this.time.delayedCall(800, () => {
-        this.launchBalanceForLevel(lv);
-      });
-    } else {
-      this.failAttempt(500);
+    // ONE_ASSET: ép cx theo side để không rớt 60/40 vì “trôi tâm”
+    if (lv.kind === 'ONE_ASSET') {
+      cx =
+        side === 'LEFT'
+          ? this.boardRect.x + this.boardRect.width * 0.25
+          : this.boardRect.x + this.boardRect.width * 0.75;
     }
+
+    const sideCorrect = this.isCorrectSide60_40(lv, cx);
+    if (!sideCorrect || !snap) {
+      this.failAttempt(500);
+      return;
+    }
+
+    // ✅ cover đúng
+    const targetRect = this.getCorrectTargetRect(lv);
+    const ellipseArea = Math.PI * (snap.w / 2) * (snap.h / 2);
+    const targetArea = targetRect.width * targetRect.height;
+
+    let cover = this.ellipseCoversTargetRatio(snap, targetRect, 7);
+    let minCoverage = MIN_TARGET_COVERAGE_BY_SUBJECT[lv.subject] ?? MIN_TARGET_COVERAGE;
+
+    // ✅ CAKE: tách rule MORE/LESS
+    if (lv.subject === 'CAKE') {
+      const kind = getQuestionKind(lv);
+      const rule = CAKE_RULES[kind];
+
+      // MORE: bắt khoanh to hơn -> khoanh 2 bánh sẽ fail
+      // LESS: cho khoanh nhỏ -> khoanh 2 bánh vẫn ok
+      if (ellipseArea < targetArea * rule.minAreaRatio) {
+        this.failAttempt(500);
+        return;
+      }
+
+      minCoverage = rule.minCoverage;
+    }
+
+    if (cover < minCoverage) {
+      this.failAttempt(500);
+      return;
+    }
+
+    // ✅ phạt nếu ăn sang vùng sai quá nhiều
+    const wrongRect = this.getWrongTargetRect(lv);
+    const wrongCover = this.ellipseCoversTargetRatio(snap, wrongRect, 7);
+    const maxWrong = MAX_WRONG_COVERAGE_BY_SUBJECT[lv.subject] ?? 0.2;
+
+    if (wrongCover > maxWrong) {
+      this.failAttempt(500);
+      return;
+    }
+
+    // ✅ đúng
+    this.showSnapEllipse(snap.cx, snap.cy, snap.w, snap.h);
+
+    this.showResultStamp('answer_correct');
+    this.score++;
+    this.subgameDone = true;
+
+    AudioManager.play('sfx_correct');
+    AudioManager.playCorrectAnswer?.();
+
+    this.gameState = 'LEVEL_END';
+
+    this.time.delayedCall(800, () => {
+      this.launchBalanceForLevel(lv);
+    });
   }
 }
