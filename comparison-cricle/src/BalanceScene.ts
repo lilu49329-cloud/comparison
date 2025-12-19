@@ -357,7 +357,7 @@ export default class BalanceScene extends Phaser.Scene {
     const dragY = panel.y + panelH / 2 - 50;
 
     let addedCount = 0;
-    this.objectScale = charScale * (this.subject === 'CAKE' ? 1.05 : 1.3);
+    this.objectScale = charScale * (this.subject === 'CAKE' ? 1.05 : 1.4);
 
     const startX = panel.x - ((dragCount - 1) * spacingX) / 2;
 

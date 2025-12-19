@@ -3,12 +3,7 @@ import AudioManager from './AudioManager';
 
 type Subject = 'BALL' | 'CAKE';
 
-type GameState =
-  | 'SHOW_LEVEL'
-  | 'WAIT_CHOICE'
-  | 'CHECK_CHOICE'
-  | 'LEVEL_END'
-  | 'GAME_END';
+type GameState = 'SHOW_LEVEL' | 'WAIT_CHOICE' | 'CHECK_CHOICE' | 'LEVEL_END' | 'GAME_END';
 type Side = 'LEFT' | 'RIGHT';
 
 type LevelBase = {
@@ -92,7 +87,14 @@ const SMOOTH_STEP_PX = 2.5; // càng nhỏ càng mượt
 const MIN_POINTS = 12; // chống "chấm 1 cái"
 const MIN_PATH_LENGTH = 120; // chống "chấm 1 cái"
 
-// ✅ khoanh quá to -> sai (đang dùng 0.38 theo bạn)
+// ✅ bo góc board: dùng cho mask + contains (fix “tràn góc” do board bo tròn)
+const BOARD_CORNER_RADIUS = Math.round(Math.min(BOARD_WIDTH, BOARD_HEIGHT) * 0.075);
+const DRAW_CORNER_RADIUS = Math.max(
+  0,
+  Math.min(BOARD_CORNER_RADIUS - DRAW_INSET, Math.min(BOARD_WIDTH, BOARD_HEIGHT) / 2 - 1)
+);
+
+// ✅ khoanh quá to -> sai
 const MAX_BBOX_BOARD_AREA_RATIO = 0.38;
 
 // ✅ giữ constant cũ làm fallback để không phá logic hiện tại
@@ -176,18 +178,54 @@ export default class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
+  // ✅ point-in-rounded-rect (fix “tràn góc” vì board bo tròn)
+  private containsRoundedRect(rect: Phaser.Geom.Rectangle, r: number, x: number, y: number) {
+    const left = rect.x;
+    const top = rect.y;
+    const right = rect.x + rect.width;
+    const bottom = rect.y + rect.height;
+
+    if (x < left || x > right || y < top || y > bottom) return false;
+    if (r <= 0) return true;
+
+    // vùng giữa (không thuộc 4 góc)
+    if (x >= left + r && x <= right - r) return true;
+    if (y >= top + r && y <= bottom - r) return true;
+
+    const r2 = r * r;
+
+    // TL
+    if (x < left + r && y < top + r) {
+      const dx = x - (left + r);
+      const dy = y - (top + r);
+      return dx * dx + dy * dy <= r2;
+    }
+    // TR
+    if (x > right - r && y < top + r) {
+      const dx = x - (right - r);
+      const dy = y - (top + r);
+      return dx * dx + dy * dy <= r2;
+    }
+    // BL
+    if (x < left + r && y > bottom - r) {
+      const dx = x - (left + r);
+      const dy = y - (bottom - r);
+      return dx * dx + dy * dy <= r2;
+    }
+    // BR
+    if (x > right - r && y > bottom - r) {
+      const dx = x - (right - r);
+      const dy = y - (bottom - r);
+      return dx * dx + dy * dy <= r2;
+    }
+
+    return true;
+  }
+
   // ===== FIT =====
-  private fitContain(
-    img: Phaser.GameObjects.Image,
-    targetW: number,
-    targetH: number,
-    padding = 0.98
-  ) {
+  private fitContain(img: Phaser.GameObjects.Image, targetW: number, targetH: number, padding = 0.98) {
     const texture = img.texture;
-    const sourceImage = texture?.getSourceImage() as
-      | HTMLImageElement
-      | HTMLCanvasElement
-      | undefined;
+    const sourceImage = texture?.getSourceImage() as HTMLImageElement | HTMLCanvasElement | undefined;
 
     const iw = sourceImage?.width ?? img.width;
     const ih = sourceImage?.height ?? img.height;
@@ -447,17 +485,18 @@ export default class GameScene extends Phaser.Scene {
     // Lớp vẽ
     this.drawGraphics = this.add.graphics().setDepth(10);
 
-    // ✅ Mask cắt nét trong boardDrawRect
+    // ✅ Mask cắt nét trong boardDrawRect (BO GÓC)
     const maskGfx = this.make.graphics({ x: 0, y: 0 });
     maskGfx.setVisible(false);
     maskGfx.setActive(false);
 
     maskGfx.fillStyle(0xffffff, 1);
-    maskGfx.fillRect(
+    maskGfx.fillRoundedRect(
       this.boardDrawRect.x,
       this.boardDrawRect.y,
       this.boardDrawRect.width,
-      this.boardDrawRect.height
+      this.boardDrawRect.height,
+      DRAW_CORNER_RADIUS
     );
 
     this.drawMask = maskGfx.createGeometryMask();
@@ -650,9 +689,7 @@ export default class GameScene extends Phaser.Scene {
   // ================== HELPERS ==================
   private getCorrectTargetRect(lv: LevelConfig): Phaser.Geom.Rectangle {
     if (lv.kind === 'TWO_ASSETS') {
-      return lv.correctSide === 'LEFT'
-        ? this.boardImageLeft.getBounds()
-        : this.boardImageRight.getBounds();
+      return lv.correctSide === 'LEFT' ? this.boardImageLeft.getBounds() : this.boardImageRight.getBounds();
     }
 
     // ✅ ONE_ASSET: dùng target zone theo đĩa thật
@@ -661,9 +698,7 @@ export default class GameScene extends Phaser.Scene {
 
   private getWrongTargetRect(lv: LevelConfig): Phaser.Geom.Rectangle {
     if (lv.kind === 'TWO_ASSETS') {
-      return lv.correctSide === 'LEFT'
-        ? this.boardImageRight.getBounds()
-        : this.boardImageLeft.getBounds();
+      return lv.correctSide === 'LEFT' ? this.boardImageRight.getBounds() : this.boardImageLeft.getBounds();
     }
 
     return this.getOneAssetTargetRect(lv, oppositeSide(lv.correctSide));
@@ -702,6 +737,47 @@ export default class GameScene extends Phaser.Scene {
     return cx >= x0 + w * (1 - CORRECT_SIDE_RATIO); // >= 40%
   }
 
+  // ====== NEW: CONVEX HULL AREA (để khoanh nhiều vòng / không chạm điểm đầu vẫn có diện tích) ======
+  private convexHull(points: Phaser.Math.Vector2[]) {
+    const pts = [...points].sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+    if (pts.length <= 2) return pts;
+
+    const cross = (o: Phaser.Math.Vector2, a: Phaser.Math.Vector2, b: Phaser.Math.Vector2) =>
+      (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+
+    const lower: Phaser.Math.Vector2[] = [];
+    for (const p of pts) {
+      while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+        lower.pop();
+      }
+      lower.push(p);
+    }
+
+    const upper: Phaser.Math.Vector2[] = [];
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const p = pts[i];
+      while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+        upper.pop();
+      }
+      upper.push(p);
+    }
+
+    upper.pop();
+    lower.pop();
+    return lower.concat(upper);
+  }
+
+  private polygonArea(poly: Phaser.Math.Vector2[]) {
+    if (poly.length < 3) return 0;
+    let a = 0;
+    for (let i = 0; i < poly.length; i++) {
+      const p = poly[i];
+      const q = poly[(i + 1) % poly.length];
+      a += p.x * q.y - q.x * p.y;
+    }
+    return Math.abs(a) * 0.5;
+  }
+
   // vẽ mượt
   private drawSmoothSegment(from: Phaser.Math.Vector2, toX: number, toY: number) {
     const dist = Phaser.Math.Distance.Between(from.x, from.y, toX, toY);
@@ -734,8 +810,9 @@ export default class GameScene extends Phaser.Scene {
   private handleDrawStart(pointer: Phaser.Input.Pointer) {
     if (this.gameState !== 'WAIT_CHOICE') return;
 
-    const insideBoard = Phaser.Geom.Rectangle.Contains(
+    const insideBoard = this.containsRoundedRect(
       this.boardDrawRect,
+      DRAW_CORNER_RADIUS,
       pointer.worldX,
       pointer.worldY
     );
@@ -772,7 +849,7 @@ export default class GameScene extends Phaser.Scene {
     const x = pointer.worldX;
     const y = pointer.worldY;
 
-    if (!Phaser.Geom.Rectangle.Contains(this.boardDrawRect, x, y)) {
+    if (!this.containsRoundedRect(this.boardDrawRect, DRAW_CORNER_RADIUS, x, y)) {
       this.hasDrawnOutsideBoard = true;
       this.input.setDefaultCursor('default');
       return;
@@ -833,7 +910,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     const anyOutsideInPoints = this.drawPoints.some(
-      (p) => !Phaser.Geom.Rectangle.Contains(this.boardDrawRect, p.x, p.y)
+      (p) => !this.containsRoundedRect(this.boardDrawRect, DRAW_CORNER_RADIUS, p.x, p.y)
     );
     const anyOutside = this.hasDrawnOutsideBoard || anyOutsideInPoints;
     if (anyOutside) {
@@ -845,21 +922,17 @@ export default class GameScene extends Phaser.Scene {
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
 
-    if (!Phaser.Geom.Rectangle.Contains(this.boardDrawRect, cx, cy)) {
+    if (!this.containsRoundedRect(this.boardDrawRect, DRAW_CORNER_RADIUS, cx, cy)) {
       this.drawGraphics.clear();
       this.failAttempt();
       return;
     }
 
-    // Hình phải có diện tích đủ lớn
-    let area = 0;
-    for (let i = 0; i < this.drawPoints.length; i++) {
-      const p1 = this.drawPoints[i];
-      const p2 = this.drawPoints[(i + 1) % this.drawPoints.length];
-      area += p1.x * p2.y - p2.x * p1.y;
-    }
-    area = Math.abs(area) * 0.5;
-    if (bboxArea > 0 && area / bboxArea < MIN_SHAPE_AREA_RATIO) {
+    // ✅ CHANGED: diện tích theo CONVEX HULL (không cần chạm điểm đầu, khoanh nhiều vòng vẫn ổn)
+    const hull = this.convexHull(this.drawPoints);
+    const hullArea = this.polygonArea(hull);
+
+    if (bboxArea > 0 && hullArea / bboxArea < MIN_SHAPE_AREA_RATIO) {
       this.drawGraphics.clear();
       this.failAttempt();
       return;
