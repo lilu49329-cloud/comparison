@@ -101,7 +101,7 @@ class AudioManager {
                     loop: config.loop ?? false,
                     volume: config.volume ?? 1.0,
                     // Mặc định dùng WebAudio; chỉ bật html5 nếu cấu hình riêng
-                    html5: config.html5 ?? false,
+                    html5: config.html5 ?? true,
 
                     onload: () => {
                         loadedCount++;
