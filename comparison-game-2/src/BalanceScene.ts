@@ -103,15 +103,8 @@ export default class BalanceScene extends Phaser.Scene {
     this.addedCount = 0;
     this.locked = false;
 
-    // ✅ ưu tiên tính theo count để chắc chắn đúng
-    if (this.leftCount === this.rightCount) {
-      const lc = data.lessCharacter;
-      if (lc === 'BALL1') this.upgradeSide = 'LEFT';
-      else if (lc === 'BALL2') this.upgradeSide = 'RIGHT';
-      else this.upgradeSide = (lc as Side) ?? 'LEFT';
-    } else {
-      this.upgradeSide = this.leftCount < this.rightCount ? 'LEFT' : 'RIGHT';
-    }
+    // ✅ chỉ đúng khi thả vào nhân vật bên PHẢI
+    this.upgradeSide = 'RIGHT';
   }
 
   /* ===================== FX: blink alpha 1 lần / mỗi lần kéo ===================== */
@@ -386,10 +379,15 @@ export default class BalanceScene extends Phaser.Scene {
       icon.on('drag', (_: Phaser.Input.Pointer, x: number, y: number) => {
         if (this.locked) return;
 
-        icon.setPosition(x, y);
+        // ✅ không cho kéo ra khỏi board
+        const halfW = icon.displayWidth * 0.5;
+        const halfH = icon.displayHeight * 0.5;
+        const clampedX = Phaser.Math.Clamp(x, panelRect.left + halfW, panelRect.right - halfW);
+        const clampedY = Phaser.Math.Clamp(y, panelRect.top + halfH, panelRect.bottom - halfH);
+        icon.setPosition(clampedX, clampedY);
 
         if (!hasDragged) {
-          const d = Phaser.Math.Distance.Between(dragStartX, dragStartY, x, y);
+          const d = Phaser.Math.Distance.Between(dragStartX, dragStartY, clampedX, clampedY);
           if (d >= MIN_DRAG) hasDragged = true;
         }
       });
@@ -406,8 +404,8 @@ export default class BalanceScene extends Phaser.Scene {
 
         const inPanel = Phaser.Geom.Rectangle.Contains(panelRect, icon.x, icon.y);
 
-        // ✅ CÁCH 2: mục tiêu là nhân vật bên upgradeSide
-        const target = this.upgradeSide === 'LEFT' ? this.leftBase : this.rightBase;
+        // ✅ chỉ đúng khi thả vào nhân vật bên PHẢI
+        const target = this.rightBase;
 
         let isCorrectDrop = false;
         if (inPanel && target) {

@@ -34,16 +34,19 @@ document.body.style.height = "100%";
 const INTRO_VIEWPORT_BGS = [
   "assets/bg/bg1.jpg",
   "assets/bg/bg2.jpg",
+  "assets/bg/bg3.jpg",
 ];
 
 const GAME_VIEWPORT_BGS = [
   "assets/bg/bg1.jpg",
   "assets/bg/bg2.jpg",
+  "assets/bg/bg3.jpg",
 ];
 
 const END_VIEWPORT_BGS = [
   "assets/bg/bg1.jpg",
   "assets/bg/bg2.jpg",
+  "assets/bg/bg3.jpg",
 ];
 
 // Cho phép chỉnh vị trí BG (center / top...)

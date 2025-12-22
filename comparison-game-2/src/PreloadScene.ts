@@ -10,6 +10,7 @@ export default class PreloadScene extends Phaser.Scene {
     // --- BACKGROUND ---
     this.load.image('bg1', 'assets/bg/bg1.jpg');
     this.load.image('bg2', 'assets/bg/bg2.jpg');
+    this.load.image('bg3', 'assets/bg/bg3.jpg');
 
     // ===== UI & Banner (CŨ) =====
     this.load.image('banner_question', 'assets/button/Rectangle 1.png');
