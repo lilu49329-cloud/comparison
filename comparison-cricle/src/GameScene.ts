@@ -482,15 +482,13 @@ export default class GameScene extends Phaser.Scene {
     if ((window as any).setGameButtonsVisible) (window as any).setGameButtonsVisible(true);
     if ((window as any).setRandomGameViewportBg) (window as any).setRandomGameViewportBg();
 
-    // Unlock audio 1 lần
+    // Unlock audio 1 lần (tránh gọi play 2 lần khi vào scene)
     const audioUnlockedKey = '__questionAudioUnlocked__';
     const audioUnlocked = !!(window as any)[audioUnlockedKey];
-    if (audioUnlocked) {
-      this.playCurrentQuestionVoice();
-    } else {
+    if (!audioUnlocked) {
       this.input.once('pointerdown', () => {
         (window as any)[audioUnlockedKey] = true;
-        this.playCurrentQuestionVoice();
+        this.playCurrentQuestionVoice({ restart: true });
       });
     }
 
@@ -615,7 +613,7 @@ export default class GameScene extends Phaser.Scene {
     this.input.on('pointerup', this.handleDrawEnd, this);
     this.input.on('pointerupoutside', this.handleDrawEnd, this);
 
-    (window as any).playCurrentQuestionVoice = () => this.playCurrentQuestionVoice();
+    (window as any).playCurrentQuestionVoice = () => this.playCurrentQuestionVoice({ restart: true });
 
     // ===== CHAR nền =====
     const baseCharScale = height / 720;
@@ -781,13 +779,14 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  private playCurrentQuestionVoice() {
+  private playCurrentQuestionVoice(opts?: { restart?: boolean }) {
     const lv = this.levels[this.levelIndex];
     const voiceKey = lv?.voiceKey;
     if (!voiceKey) return;
 
     try {
-      if (AudioManager.isPlaying(voiceKey)) return;
+      if (!opts?.restart && AudioManager.isPlaying(voiceKey)) return;
+      AudioManager.stopAllNarration?.();
       AudioManager.play(voiceKey);
     } catch {
       // ignore
