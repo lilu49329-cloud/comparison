@@ -5,7 +5,6 @@ import EndGameScene from "./EndGameScene";
 import AudioManager from "./AudioManager";
 import { initRotateOrientation } from "./rotateOrientation";
 import PreloadScene from "./PreloadScene";
-import BalanceScene from "./BalanceScene";
 import RemoveScene from "./RemoveScene";
 
 
@@ -168,7 +167,7 @@ const config: Phaser.Types.Core.GameConfig = {
     antialias: true,
   },
   // Chạy PreloadScene trước để load toàn bộ asset, rồi mới vào GameScene
-  scene: [PreloadScene, GameScene, BalanceScene, RemoveScene, EndGameScene],
+  scene: [PreloadScene, GameScene, RemoveScene, EndGameScene],
 };
 
 // ================== KẾT NỐI NÚT HTML (ngoài Phaser) ==================
@@ -181,18 +180,7 @@ function setupHtmlButtons() {
       // Dừng toàn bộ âm thanh trước khi chơi lại để tránh lồng nhau
       AudioManager.stopAll();
 
-      // Nếu đang ở màn phụ (BalanceScene/RemoveScene) → dừng màn phụ và quay lại GameScene của level hiện tại
-      const balance = game.scene.getScene("BalanceScene") as BalanceScene | null;
-      if (balance && balance.scene.isActive()) {
-        const levelIndex = balance.levelIndex ?? 0;
-        const score = balance.score ?? 0;
-
-        game.scene.stop("BalanceScene");
-        game.scene.start("GameScene", { levelIndex, score });
-        ensureBgmStarted();
-        return;
-      }
-
+      // Nếu đang ở màn phụ (RemoveScene) → dừng màn phụ và quay lại GameScene của level hiện tại
       const remove = game.scene.getScene("RemoveScene") as RemoveScene | null;
       if (remove && remove.scene.isActive()) {
         const levelIndex = remove.levelIndex ?? 0;

@@ -359,6 +359,24 @@ export default class RemoveScene extends Phaser.Scene {
     item.setInteractive({ draggable: true, cursor: 'pointer' });
     this.input.setDraggable(item);
 
+    const clampToBoard = (x: number, y: number) => {
+      const r = this.panelRect;
+      if (!r) return { x, y };
+
+      const halfW = item.displayWidth * 0.5;
+      const halfH = item.displayHeight * 0.5;
+
+      const minX = r.left + halfW;
+      const maxX = r.right - halfW;
+      const minY = r.top + halfH;
+      const maxY = r.bottom - halfH;
+
+      return {
+        x: maxX < minX ? r.centerX : Phaser.Math.Clamp(x, minX, maxX),
+        y: maxY < minY ? r.centerY : Phaser.Math.Clamp(y, minY, maxY),
+      };
+    };
+
     item.on('dragstart', () => {
       // As soon as the child interacts, stop the guide voice (avoid talking over dragging).
       this.stopGuideVoice();
@@ -373,7 +391,8 @@ export default class RemoveScene extends Phaser.Scene {
     });
 
     item.on('drag', (_: Phaser.Input.Pointer, x: number, y: number) => {
-      item.setPosition(x, y);
+      const p = clampToBoard(x, y);
+      item.setPosition(p.x, p.y);
     });
 
     item.on('dragend', () => {

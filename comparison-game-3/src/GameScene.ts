@@ -132,7 +132,7 @@ const STACK_AREA_TWEAK_BY_SUBJECT: Record<
 > = {
   CHILI: { leftX: 0, rightX: 0, leftY: 0, rightY: 0 },
   VEGETABLE: { leftX: 0, rightX: 0, leftY: 0, rightY: 0 },
-  FLOWER: { leftX: -30, rightX: 3, leftY: 20, rightY: 0 },
+  FLOWER: { leftX: -15, rightX: 3, leftY: 0, rightY: 0 },
 };
 
 /* ===================== SCENE ===================== */
