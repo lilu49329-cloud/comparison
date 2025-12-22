@@ -77,7 +77,7 @@ const LINE_COLOR = 0x40916d; // #40916D
 const LINE_WIDTH = 8;
 
 // ===== DRAW RULES =====
-const MIN_SHAPE_AREA_RATIO = 0.05;
+const MIN_SHAPE_AREA_RATIO = 0.03;
 const MID_DEADZONE_RATIO = 0.06; // vùng giữa không tính đúng (ép bé chọn trái/phải rõ ràng)
 const MID_DEADZONE_MIN_PX = 30;
 
@@ -86,6 +86,9 @@ const DRAW_INSET = Math.ceil(LINE_WIDTH / 2) + 2; // không cho nét chạm vi�
 const SMOOTH_STEP_PX = 2.5; // càng nhỏ càng mượt
 const MIN_POINTS = 12; // chống "chấm 1 cái"
 const MIN_PATH_LENGTH = 120; // chống "chấm 1 cái"
+
+// ✅ cho phép bé vẽ “chạm viền” (không fail nếu lố nhẹ), vẫn giới hạn nếu đi ra quá xa
+const DRAW_OUTSIDE_TOLERANCE_PX = Math.max(22, LINE_WIDTH * 2.25);
 
 // ✅ bo góc board: dùng cho mask + contains (fix “tràn góc” do board bo tròn)
 const BOARD_CORNER_RADIUS = Math.round(Math.min(BOARD_WIDTH, BOARD_HEIGHT) * 0.075);
@@ -96,6 +99,13 @@ const DRAW_CORNER_RADIUS = Math.max(
 
 // ✅ khoanh quá to -> sai
 const MAX_BBOX_BOARD_AREA_RATIO = 0.38;
+// ✅ nhưng nếu bé khoanh chạm viền thì nới nhẹ (tránh bị fail vì chạm mép)
+const MAX_BBOX_BOARD_AREA_RATIO_TOUCHING_EDGE = 0.55;
+const EDGE_TOUCH_PX = Math.max(18, LINE_WIDTH * 2.25);
+
+// ✅ cho phép khoanh chưa tròn (hơn chữ C một chút) vẫn tính hợp lệ
+const OPEN_CIRCLE_MIN_DIM_PX = 32;
+const OPEN_CIRCLE_MIN_ARC_RATIO = 0.42;
 
 // ✅ giữ constant cũ làm fallback để không phá logic hiện tại
 const MIN_TARGET_COVERAGE = 0.7; // fallback
@@ -159,6 +169,7 @@ export default class GameScene extends Phaser.Scene {
 
   // ✅ vùng cho phép vẽ (inset) + mask để cắt nét
   private boardDrawRect!: Phaser.Geom.Rectangle;
+  private boardDrawRectLoose!: Phaser.Geom.Rectangle;
   private drawMask?: Phaser.Display.Masks.GeometryMask;
 
   private drawGraphics!: Phaser.GameObjects.Graphics;
@@ -176,6 +187,95 @@ export default class GameScene extends Phaser.Scene {
 
   constructor() {
     super('GameScene');
+  }
+
+  private clampPointToRoundedRect(rect: Phaser.Geom.Rectangle, r: number, x: number, y: number) {
+    const left = rect.x;
+    const top = rect.y;
+    const right = rect.x + rect.width;
+    const bottom = rect.y + rect.height;
+
+    let px = Phaser.Math.Clamp(x, left, right);
+    let py = Phaser.Math.Clamp(y, top, bottom);
+
+    if (this.containsRoundedRect(rect, r, px, py)) return { x: px, y: py };
+
+    if (r <= 0) return { x: px, y: py };
+
+    // Đẩy điểm vào trong 4 góc bo tròn
+    const cornerInsetX = left + r;
+    const cornerInsetY = top + r;
+    const cornerInsetRightX = right - r;
+    const cornerInsetBottomY = bottom - r;
+
+    let cx = px;
+    let cy = py;
+
+    // TL
+    if (cx < cornerInsetX && cy < cornerInsetY) {
+      const ccx = cornerInsetX;
+      const ccy = cornerInsetY;
+      let vx = cx - ccx;
+      let vy = cy - ccy;
+      const len = Math.hypot(vx, vy) || 1;
+      vx /= len;
+      vy /= len;
+      cx = ccx + vx * (r - 0.5);
+      cy = ccy + vy * (r - 0.5);
+    }
+    // TR
+    else if (cx > cornerInsetRightX && cy < cornerInsetY) {
+      const ccx = cornerInsetRightX;
+      const ccy = cornerInsetY;
+      let vx = cx - ccx;
+      let vy = cy - ccy;
+      const len = Math.hypot(vx, vy) || 1;
+      vx /= len;
+      vy /= len;
+      cx = ccx + vx * (r - 0.5);
+      cy = ccy + vy * (r - 0.5);
+    }
+    // BL
+    else if (cx < cornerInsetX && cy > cornerInsetBottomY) {
+      const ccx = cornerInsetX;
+      const ccy = cornerInsetBottomY;
+      let vx = cx - ccx;
+      let vy = cy - ccy;
+      const len = Math.hypot(vx, vy) || 1;
+      vx /= len;
+      vy /= len;
+      cx = ccx + vx * (r - 0.5);
+      cy = ccy + vy * (r - 0.5);
+    }
+    // BR
+    else if (cx > cornerInsetRightX && cy > cornerInsetBottomY) {
+      const ccx = cornerInsetRightX;
+      const ccy = cornerInsetBottomY;
+      let vx = cx - ccx;
+      let vy = cy - ccy;
+      const len = Math.hypot(vx, vy) || 1;
+      vx /= len;
+      vy /= len;
+      cx = ccx + vx * (r - 0.5);
+      cy = ccy + vy * (r - 0.5);
+    }
+
+    // Chốt lại: nếu vẫn ngoài (hiếm), kéo về tâm rect
+    if (!this.containsRoundedRect(rect, r, cx, cy)) {
+      cx = Phaser.Math.Clamp(cx, left + r, right - r);
+      cy = Phaser.Math.Clamp(cy, top + r, bottom - r);
+    }
+
+    return { x: cx, y: cy };
+  }
+
+  private ellipsePerimeterApprox(rx: number, ry: number) {
+    const a = Math.max(0, rx);
+    const b = Math.max(0, ry);
+    if (a <= 0 || b <= 0) return 0;
+    // Ramanujan approximation
+    const h = Math.pow(a - b, 2) / Math.pow(a + b, 2);
+    return Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
   }
 
   // ✅ point-in-rounded-rect (fix “tràn góc” vì board bo tròn)
@@ -444,6 +544,14 @@ export default class GameScene extends Phaser.Scene {
       boardY + DRAW_INSET,
       BOARD_WIDTH - DRAW_INSET * 2,
       BOARD_HEIGHT - DRAW_INSET * 2
+    );
+
+    // ✅ Rect “nới” để không fail khi bé vẽ chạm viền / lố nhẹ
+    this.boardDrawRectLoose = new Phaser.Geom.Rectangle(
+      this.boardDrawRect.x - DRAW_OUTSIDE_TOLERANCE_PX,
+      this.boardDrawRect.y - DRAW_OUTSIDE_TOLERANCE_PX,
+      this.boardDrawRect.width + DRAW_OUTSIDE_TOLERANCE_PX * 2,
+      this.boardDrawRect.height + DRAW_OUTSIDE_TOLERANCE_PX * 2
     );
 
     // Stamp đúng/sai
@@ -811,8 +919,8 @@ export default class GameScene extends Phaser.Scene {
     if (this.gameState !== 'WAIT_CHOICE') return;
 
     const insideBoard = this.containsRoundedRect(
-      this.boardDrawRect,
-      DRAW_CORNER_RADIUS,
+      this.boardDrawRectLoose,
+      DRAW_CORNER_RADIUS + DRAW_OUTSIDE_TOLERANCE_PX,
       pointer.worldX,
       pointer.worldY
     );
@@ -835,10 +943,17 @@ export default class GameScene extends Phaser.Scene {
     this.drawGraphics.clear();
     this.drawGraphics.lineStyle(LINE_WIDTH, LINE_COLOR, 1);
 
-    this.drawGraphics.fillStyle(LINE_COLOR, 1);
-    this.drawGraphics.fillCircle(pointer.worldX, pointer.worldY, LINE_WIDTH / 2);
+    const start = this.clampPointToRoundedRect(
+      this.boardDrawRect,
+      DRAW_CORNER_RADIUS,
+      pointer.worldX,
+      pointer.worldY
+    );
 
-    this.drawPoints.push(new Phaser.Math.Vector2(pointer.worldX, pointer.worldY));
+    this.drawGraphics.fillStyle(LINE_COLOR, 1);
+    this.drawGraphics.fillCircle(start.x, start.y, LINE_WIDTH / 2);
+
+    this.drawPoints.push(new Phaser.Math.Vector2(start.x, start.y));
 
     this.input.setDefaultCursor('crosshair');
   }
@@ -849,7 +964,13 @@ export default class GameScene extends Phaser.Scene {
     const x = pointer.worldX;
     const y = pointer.worldY;
 
-    if (!this.containsRoundedRect(this.boardDrawRect, DRAW_CORNER_RADIUS, x, y)) {
+    const insideLoose = this.containsRoundedRect(
+      this.boardDrawRectLoose,
+      DRAW_CORNER_RADIUS + DRAW_OUTSIDE_TOLERANCE_PX,
+      x,
+      y
+    );
+    if (!insideLoose) {
       this.hasDrawnOutsideBoard = true;
       this.input.setDefaultCursor('default');
       return;
@@ -858,7 +979,11 @@ export default class GameScene extends Phaser.Scene {
     const last = this.drawPoints[this.drawPoints.length - 1];
     if (!last) return;
 
-    this.drawSmoothSegment(last, x, y);
+    const insideStrict = this.containsRoundedRect(this.boardDrawRect, DRAW_CORNER_RADIUS, x, y);
+    const next = insideStrict ? { x, y } : this.clampPointToRoundedRect(this.boardDrawRect, DRAW_CORNER_RADIUS, x, y);
+
+    this.drawSmoothSegment(last, next.x, next.y);
+    this.input.setDefaultCursor('crosshair');
   }
 
   private handleDrawEnd() {
@@ -903,17 +1028,22 @@ export default class GameScene extends Phaser.Scene {
     // ✅ dùng boardDrawRect area (đúng với vùng bé được phép vẽ)
     const boardArea = this.boardDrawRect.width * this.boardDrawRect.height;
     const bboxArea = w * h;
-    if (boardArea > 0 && bboxArea / boardArea > MAX_BBOX_BOARD_AREA_RATIO) {
+
+    const touchesEdge =
+      minX <= this.boardDrawRect.x + EDGE_TOUCH_PX ||
+      maxX >= this.boardDrawRect.x + this.boardDrawRect.width - EDGE_TOUCH_PX ||
+      minY <= this.boardDrawRect.y + EDGE_TOUCH_PX ||
+      maxY >= this.boardDrawRect.y + this.boardDrawRect.height - EDGE_TOUCH_PX;
+
+    const maxBoxRatio = touchesEdge ? MAX_BBOX_BOARD_AREA_RATIO_TOUCHING_EDGE : MAX_BBOX_BOARD_AREA_RATIO;
+
+    if (boardArea > 0 && bboxArea / boardArea > maxBoxRatio) {
       this.drawGraphics.clear();
       this.failAttempt();
       return;
     }
 
-    const anyOutsideInPoints = this.drawPoints.some(
-      (p) => !this.containsRoundedRect(this.boardDrawRect, DRAW_CORNER_RADIUS, p.x, p.y)
-    );
-    const anyOutside = this.hasDrawnOutsideBoard || anyOutsideInPoints;
-    if (anyOutside) {
+    if (this.hasDrawnOutsideBoard) {
       this.drawGraphics.clear();
       this.failAttempt();
       return;
@@ -922,7 +1052,11 @@ export default class GameScene extends Phaser.Scene {
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
 
-    if (!this.containsRoundedRect(this.boardDrawRect, DRAW_CORNER_RADIUS, cx, cy)) {
+    const centerOk =
+      this.containsRoundedRect(this.boardDrawRect, DRAW_CORNER_RADIUS, cx, cy) ||
+      this.containsRoundedRect(this.boardDrawRectLoose, DRAW_CORNER_RADIUS + DRAW_OUTSIDE_TOLERANCE_PX, cx, cy);
+
+    if (!centerOk) {
       this.drawGraphics.clear();
       this.failAttempt();
       return;
@@ -933,9 +1067,17 @@ export default class GameScene extends Phaser.Scene {
     const hullArea = this.polygonArea(hull);
 
     if (bboxArea > 0 && hullArea / bboxArea < MIN_SHAPE_AREA_RATIO) {
-      this.drawGraphics.clear();
-      this.failAttempt();
-      return;
+      // ✅ Nếu khoanh chưa kín (kiểu chữ C) nhưng đủ “quây” quanh mục tiêu thì vẫn cho qua
+      const minDim = Math.min(w, h);
+      const perim = this.ellipsePerimeterApprox(w / 2, h / 2);
+      const arcRatio = perim > 0 ? pathLen / perim : 0;
+      const looksLikeOpenCircle = minDim >= OPEN_CIRCLE_MIN_DIM_PX && arcRatio >= OPEN_CIRCLE_MIN_ARC_RATIO;
+
+      if (!looksLikeOpenCircle) {
+        this.drawGraphics.clear();
+        this.failAttempt();
+        return;
+      }
     }
 
     const lv = this.levels[this.levelIndex];
