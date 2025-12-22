@@ -18,17 +18,17 @@ const SOUND_MAP: Record<string, SoundConfig> = {
 
     'sfx-click': {
         src: `${BASE_PATH}sfx/click.mp3`,
-        volume: 0.9,
+        volume: 0.7,
         html5: true,
     },
     correct: {
         src: `${BASE_PATH}sfx/correct.mp3`,
-        volume: 1.0,
+        volume: 0.7,
         html5: true,
     },
     wrong: {
         src: `${BASE_PATH}sfx/wrong.mp3`,
-        volume: 0.9,
+        volume: 0.7,
         html5: true,
     },
 
