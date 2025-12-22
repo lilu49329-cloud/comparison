@@ -131,17 +131,6 @@ export function ensureBgmStarted() {
 
 
 
-// function setupGlobalBgm() {
-//   const startBgm = () => {
-//     ensureBgmStarted();
-//   };
-
-//   ["pointerdown", "touchstart", "mousedown"].forEach((ev) => {
-//     document.addEventListener(ev, startBgm, { once: true });
-//   });
-// }
-
-
 // Cố gắng resume AudioContext khi overlay bật/tắt
 function resumeSoundContext(scene: Phaser.Scene) {
   const sm = scene.sound as any;
