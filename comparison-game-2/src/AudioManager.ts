@@ -17,9 +17,9 @@ const BASE_PATH = 'assets/audio/';
 // 3. Ánh xạ ID âm thanh (key) và cấu hình chi tiết
 const SOUND_MAP: Record<string, SoundConfig> = {
     // ---- SFX Chung ----
-    'sfx_correct': { src: `${BASE_PATH}correct.mp3`, volume: 1.0 },
-    'sfx_wrong': { src: `${BASE_PATH}wrong.mp3`, volume: 0.8 },
-    'sfx_click': { src: `${BASE_PATH}click.mp3`, volume: 0.8 },
+    'sfx_correct': { src: `${BASE_PATH}correct.mp3`, volume: 0.7 },
+    'sfx_wrong': { src: `${BASE_PATH}wrong.mp3`, volume: 0.7 },
+    'sfx_click': { src: `${BASE_PATH}click.mp3`, volume: 0.7 },
     'voice_rotate': { src: `${BASE_PATH}xoay.mp3`, volume: 0.8 },
 
     // ---- Correct Answers Voice Prompts ----
@@ -44,7 +44,7 @@ const SOUND_MAP: Record<string, SoundConfig> = {
     "bgm_main": {
         src: `${BASE_PATH}bgm_main.mp3`,
         loop: true,
-        volume: 0.5, // tuỳ bạn, có thể giữ 1.0
+        volume: 0.35, // tuỳ bạn, có thể giữ 1.0
         html5: false,
         },
         
@@ -53,7 +53,7 @@ const SOUND_MAP: Record<string, SoundConfig> = {
     // ... Thêm các cặp còn lại vào SOUND_MAP ...
     "voice_need_finish": { src: `${BASE_PATH}voice_need_finish.mp3` },
 
-    "voice_complete": { src: `${BASE_PATH}complete.mp3`, volume: 1.0 },
+    "voice_complete": { src: `${BASE_PATH}complete.mp3`, volume: 0.5 },
     "fireworks": { src: `${BASE_PATH}fireworks.mp3`, volume: 1.0 },
     "applause": { src: `${BASE_PATH}applause.mp3`, volume: 1.0 },
 
