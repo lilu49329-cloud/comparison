@@ -56,8 +56,3 @@ export function preloadGameAssets(scene: Phaser.Scene): void {
   scene.load.image("ic_7", "assets/bg_end/ic_7.png");
   scene.load.image("ic_8", "assets/bg_end/ic_8.png");
 }
-
-// Giữ hàm cũ cho tương thích, nếu đâu đó vẫn gọi preloadAssets
-export function preloadAssets(scene: Phaser.Scene): void {
-  preloadGameAssets(scene);
-}
