@@ -31,9 +31,10 @@ const RESULT_STAMP_SIZE = 72;
 
 /* ===================== DROP TARGET (CÁCH 2) ===================== */
 
-// ✅ nới vùng thả quanh nhân vật (tăng = dễ thả hơn)
-const DROP_PAD_X = 70;
-const DROP_PAD_Y = 70;
+// ✅ hitbox thả: thu nhỏ so với bounds để tránh ăn ở góc/viền (phù hợp nhiều tỉ lệ màn)
+const DROP_HIT_INSET_X_RATIO = 0.18;
+const DROP_HIT_INSET_TOP_RATIO = 0.22;
+const DROP_HIT_INSET_BOTTOM_RATIO = 0.22;
 
 // ✅ chống “tap cũng tính drop”
 const DRAG_DISTANCE_THRESHOLD = 12;
@@ -410,8 +411,20 @@ export default class BalanceScene extends Phaser.Scene {
         let isCorrectDrop = false;
         if (inPanel && target) {
           const r = target.getBounds(); // theo display size hiện tại
-          Phaser.Geom.Rectangle.Inflate(r, DROP_PAD_X, DROP_PAD_Y);
-          isCorrectDrop = Phaser.Geom.Rectangle.Contains(r, icon.x, icon.y);
+
+          const insetX = r.width * DROP_HIT_INSET_X_RATIO;
+          const insetTop = r.height * DROP_HIT_INSET_TOP_RATIO;
+          const insetBottom = r.height * DROP_HIT_INSET_BOTTOM_RATIO;
+
+          r.x += insetX;
+          r.width -= insetX * 2;
+          r.y += insetTop;
+          r.height -= insetTop + insetBottom;
+
+          // safety: tránh r bị âm khi asset quá nhỏ
+          if (r.width > 1 && r.height > 1) {
+            isCorrectDrop = Phaser.Geom.Rectangle.Contains(r, icon.x, icon.y);
+          }
         }
 
         if (isCorrectDrop) {
