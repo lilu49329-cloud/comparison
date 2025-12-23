@@ -137,7 +137,7 @@ export default class RemoveScene extends Phaser.Scene {
     const gameScene = this.scene.get('GameScene') as GameScene;
     if (gameScene) gameScene.subgameDone = true;
 
-    this.time.delayedCall(400, () => {
+    this.time.delayedCall(600, () => {
       this.scene.start(this.nextSceneKey, {
         score: this.score,
         levelIndex: this.levelIndex + 1,
