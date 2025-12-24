@@ -280,6 +280,7 @@ export default class GameScene extends Phaser.Scene {
   create() {
     this.input.once('pointerdown', () => {
       AudioManager.unlockAndWarmup(['sfx_click', 'sfx_correct', 'sfx_wrong']);
+      AudioManager.play('bgm_main');
     });
 
     try {
