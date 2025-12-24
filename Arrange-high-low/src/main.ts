@@ -1,5 +1,4 @@
 import Phaser from "phaser";
-//import OverlayScene from "./OverlayScene";
 import GameScene from "./GameScene";
 import EndGameScene from "./EndGameScene";
 import AudioManager from "./AudioManager";
@@ -28,7 +27,7 @@ document.body.style.padding = "0";
 document.body.style.width = "100%";
 document.body.style.height = "100%";
 
-// ========== RANDOM BACKGROUND VIEWPORT ==========
+// ========== RANDOM BACKGROUND VIEWPORT ========== 
 const INTRO_VIEWPORT_BGS = ["assets/bg/bg1.jpg", "assets/bg/bg2.jpg"];
 const GAME_VIEWPORT_BGS = ["assets/bg/bg1.jpg", "assets/bg/bg2.jpg"];
 const END_VIEWPORT_BGS = ["assets/bg/bg1.jpg", "assets/bg/bg2.jpg"];
@@ -43,8 +42,7 @@ function setViewportBg(url: string, position: string = "center center") {
 }
 
 export function setRandomIntroViewportBg() {
-  const url =
-    INTRO_VIEWPORT_BGS[Math.floor(Math.random() * INTRO_VIEWPORT_BGS.length)];
+  const url = INTRO_VIEWPORT_BGS[Math.floor(Math.random() * INTRO_VIEWPORT_BGS.length)];
 
   const isLandscape = window.innerWidth > window.innerHeight;
 
@@ -57,25 +55,19 @@ export function setRandomIntroViewportBg() {
 }
 
 export function setRandomGameViewportBg() {
-  const url =
-    GAME_VIEWPORT_BGS[Math.floor(Math.random() * GAME_VIEWPORT_BGS.length)];
+  const url = GAME_VIEWPORT_BGS[Math.floor(Math.random() * GAME_VIEWPORT_BGS.length)];
   setViewportBg(url, "center center");
 }
 
 export function setRandomEndViewportBg() {
-  const url =
-    END_VIEWPORT_BGS[Math.floor(Math.random() * END_VIEWPORT_BGS.length)];
+  const url = END_VIEWPORT_BGS[Math.floor(Math.random() * END_VIEWPORT_BGS.length)];
   setViewportBg(url, "center center");
 }
 
 // ========== HIỆN / ẨN NÚT VIEWPORT ==========
 function setGameButtonsVisible(visible: boolean) {
-  const replayBtn = document.getElementById("btn-replay") as
-    | HTMLButtonElement
-    | null;
-  const nextBtn = document.getElementById("btn-next") as
-    | HTMLButtonElement
-    | null;
+  const replayBtn = document.getElementById("btn-replay") as HTMLButtonElement | null;
+  const nextBtn = document.getElementById("btn-next") as HTMLButtonElement | null;
 
   const display = visible ? "block" : "none";
   if (replayBtn) replayBtn.style.display = display;
@@ -126,15 +118,14 @@ const config: Phaser.Types.Core.GameConfig = {
   parent: containerId,
   transparent: true, // Canvas trong suốt để nhìn thấy background của body
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    mode: Phaser.Scale.FIT, // Điều chỉnh tự động phù hợp với màn hình
+    autoCenter: Phaser.Scale.CENTER_BOTH, // Căn giữa game
   },
   render: {
     pixelArt: false,
     antialias: true,
   },
-  // Chạy PreloadScene trước để load toàn bộ asset, rồi mới vào GameScene
-  scene: [PreloadScene, GameScene, EndGameScene],
+  scene: [PreloadScene, GameScene, EndGameScene], // Các scene trong game
 };
 
 // ✅ helper: cố gắng lấy số lượng level an toàn
@@ -217,32 +208,32 @@ function waitForFredoka(): Promise<void> {
 // ================== KHỞI TẠO GAME ==================
 async function initGame() {
   try {
-    await waitForFredoka();
+    await waitForFredoka(); // Chờ font Fredoka
   } catch (e) {
     console.warn("Không load kịp font Fredoka, chạy game luôn.");
   }
 
   try {
-    await AudioManager.loadAll();
+    await AudioManager.loadAll(); // Chờ tải tất cả âm thanh
   } catch (e) {
     console.warn("Không load được audio, chạy game luôn.", e);
   }
 
   if (!game) {
     game = new Phaser.Game(config);
-    initRotateOrientation(game);
-    setupHtmlButtons();
+    initRotateOrientation(game); // Khởi tạo xoay màn hình cho game nếu cần
+    setupHtmlButtons(); // Cài đặt các nút HTML
   }
 
+  // Cài đặt canvas để đảm bảo game luôn hiển thị chính xác
   setTimeout(() => {
-    const canvas =
-      document.querySelector<HTMLCanvasElement>("#game-container canvas");
+    const canvas = document.querySelector<HTMLCanvasElement>("#game-container canvas");
     if (canvas) {
       canvas.style.margin = "0";
       canvas.style.padding = "0";
       canvas.style.display = "block";
       canvas.style.imageRendering = "auto";
-      canvas.style.backgroundColor = "transparent";
+      canvas.style.backgroundColor = "transparent"; // Đảm bảo canvas không bị che khuất
     }
   }, 50);
 }
