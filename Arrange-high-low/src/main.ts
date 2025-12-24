@@ -6,8 +6,6 @@ import AudioManager from "./AudioManager";
 import { initRotateOrientation } from "./rotateOrientation";
 import PreloadScene from "./PreloadScene";
 
-
-
 // ================== TẠO CONTAINER GAME ==================
 const containerId = "game-container";
 let container = document.getElementById(containerId);
@@ -31,20 +29,9 @@ document.body.style.width = "100%";
 document.body.style.height = "100%";
 
 // ========== RANDOM BACKGROUND VIEWPORT ==========
-const INTRO_VIEWPORT_BGS = [
-  "assets/bg/bg1.jpg",
-  "assets/bg/bg2.jpg",
-];
-
-const GAME_VIEWPORT_BGS = [
-  "assets/bg/bg1.jpg",
-  "assets/bg/bg2.jpg",
-];
-
-const END_VIEWPORT_BGS = [
-  "assets/bg/bg1.jpg",
-  "assets/bg/bg2.jpg",
-];
+const INTRO_VIEWPORT_BGS = ["assets/bg/bg1.jpg", "assets/bg/bg2.jpg"];
+const GAME_VIEWPORT_BGS = ["assets/bg/bg1.jpg", "assets/bg/bg2.jpg"];
+const END_VIEWPORT_BGS = ["assets/bg/bg1.jpg", "assets/bg/bg2.jpg"];
 
 // Cho phép chỉnh vị trí BG (center / top...)
 function setViewportBg(url: string, position: string = "center center") {
@@ -89,9 +76,11 @@ function setGameButtonsVisible(visible: boolean) {
   const nextBtn = document.getElementById("btn-next") as
     | HTMLButtonElement
     | null;
+
   const display = visible ? "block" : "none";
   if (replayBtn) replayBtn.style.display = display;
-  // Luôn ẩn nút chuyển màn
+
+  // ✅ Next bị remove khỏi DOM, nhưng giữ câu lệnh này để "giữ nguyên logic"
   if (nextBtn) nextBtn.style.display = "none";
 }
 
@@ -111,9 +100,8 @@ if (container instanceof HTMLDivElement) {
 
 // Giữ tham chiếu game để tránh tạo nhiều lần (HMR, reload…)
 let game: Phaser.Game | null = null;
-// ========== GLOBAL BGM (CHẠY XUYÊN SUỐT GAME) ==========
-// ========== GLOBAL BGM (CHẠY XUYÊN SUỐT GAME) ==========
 
+// ========== GLOBAL BGM (CHẠY XUYÊN SUỐT GAME) ==========
 export function ensureBgmStarted() {
   console.log("[BGM] ensure play bgm_main");
   // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
@@ -122,34 +110,13 @@ export function ensureBgmStarted() {
   }
 }
 
-
-
-// function setupGlobalBgm() {
-//   const startBgm = () => {
-//     ensureBgmStarted();
-//   };
-
-//   ["pointerdown", "touchstart", "mousedown"].forEach((ev) => {
-//     document.addEventListener(ev, startBgm, { once: true });
-//   });
-// }
-
-
-// Cố gắng resume AudioContext khi overlay bật/tắt
-// function resumeSoundContext(scene: Phaser.Scene) {
-//   const sm = scene.sound as any;
-//   const ctx: AudioContext | undefined = sm.context || sm.audioContext;
-//   if (ctx && ctx.state === "suspended" && typeof ctx.resume === "function") {
-//     ctx.resume();
-//   }
-// }
 // Cho các Scene gọi qua window
-(Object.assign(window as any, {
+Object.assign(window as any, {
   setRandomIntroViewportBg,
   setRandomGameViewportBg,
   setRandomEndViewportBg,
   setGameButtonsVisible,
-}));
+});
 
 // ================== CẤU HÌNH PHASER ==================
 const config: Phaser.Types.Core.GameConfig = {
@@ -170,6 +137,19 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [PreloadScene, GameScene, EndGameScene],
 };
 
+// ✅ helper: cố gắng lấy số lượng level an toàn
+function getTotalLevels(scene: any): number {
+  const n =
+    scene?.totalLevels ??
+    scene?.TOTAL_LEVELS ??
+    (Array.isArray(scene?.levels) ? scene.levels.length : undefined) ??
+    (Array.isArray(scene?.levelConfigs) ? scene.levelConfigs.length : undefined) ??
+    (typeof scene?.getLevelCount === "function" ? scene.getLevelCount() : undefined);
+
+  // Nếu không lấy được, để 1 để khỏi random sai index (tránh crash)
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
 // ================== KẾT NỐI NÚT HTML (ngoài Phaser) ==================
 function setupHtmlButtons() {
   const replayBtn = document.getElementById("btn-replay");
@@ -179,24 +159,33 @@ function setupHtmlButtons() {
 
       // Dừng toàn bộ âm thanh trước khi chơi lại để tránh lồng nhau
       AudioManager.stopAll();
-      // Ngược lại, đang ở GameScene → restart lại level hiện tại
-      const scene = game.scene.getScene("GameScene") as GameScene | null;
-      if (!scene) return;
-      scene.scene.restart({
-        levelIndex: scene.levelIndex,
-        score: scene.score,
-      });
+
+      const gs = game.scene.getScene("GameScene") as GameScene | null;
+
+      const total = getTotalLevels(gs);
+      const randomIndex = Phaser.Math.Between(0, total - 1);
+
+      const data = {
+        levelIndex: randomIndex,
+        score: (gs as any)?.score ?? 0, // giữ logic cũ: có score thì giữ, không có thì 0
+      };
+
+      // ✅ “ở đâu cũng replay được”: đang ở GameScene thì restart, còn lại thì start GameScene
+      if (gs && game.scene.isActive("GameScene")) {
+        gs.scene.restart(data);
+      } else {
+        // nếu đang ở EndGameScene thì stop để khỏi chồng scene
+        if (game.scene.isActive("EndGameScene")) game.scene.stop("EndGameScene");
+        game.scene.start("GameScene", data);
+      }
+
       ensureBgmStarted();
     });
   }
 
-  // Ẩn hoàn toàn nút chuyển màn
-  const nextBtn = document.getElementById("btn-next") as
-    | HTMLButtonElement
-    | null;
-  if (nextBtn) {
-    nextBtn.style.display = "none";
-  }
+  // ✅ BỎ HẲN NÚT NEXT: remove khỏi DOM luôn
+  const nextBtn = document.getElementById("btn-next");
+  if (nextBtn) nextBtn.remove();
 
   // Mặc định ẩn nút (intro, endgame)
   setGameButtonsVisible(false);
@@ -224,6 +213,7 @@ function waitForFredoka(): Promise<void> {
     }, 10);
   });
 }
+
 // ================== KHỞI TẠO GAME ==================
 async function initGame() {
   try {
@@ -238,13 +228,9 @@ async function initGame() {
     console.warn("Không load được audio, chạy game luôn.", e);
   }
 
-  // Bật nhạc nền 1 lần, loop xuyên suốt game (sau user gesture)
-  // setupGlobalBgm();
-
   if (!game) {
-    // setRandomIntroViewportBg();
     game = new Phaser.Game(config);
-    initRotateOrientation(game); 
+    initRotateOrientation(game);
     setupHtmlButtons();
   }
 

@@ -33,11 +33,14 @@ type DraggableItem = {
   id: SortItemId;
   container: Phaser.GameObjects.Container;
   startIndex: number;
+
+  // ✅ slotIndex bây giờ là "slot hàng trên" (slotCenters)
   slotIndex: number | null;
   prevSlotIndex: number | null;
+
   dragClampRect: Phaser.Geom.Rectangle;
   dragOffsetX: number;
-  dragFixedY: number;
+  dragOffsetY: number; // ✅ NEW: kéo tự do cả X/Y
 };
 
 /* ===================== ASSETS ===================== */
@@ -214,7 +217,7 @@ export default class GameScene extends Phaser.Scene {
   private boardX = 0;
   private boardY = 0;
 
-  private currentDirection: SortDirection = 'DESC';
+  private currentDirection: SortDirection = 'ASC'; // ✅ mặc định ASC
   private currentLevelItemIds: SortItemId[] = [];
   private currentTheme: SortThemeId = 'BUILDING';
   private currentVoiceId?: string;
@@ -235,6 +238,11 @@ export default class GameScene extends Phaser.Scene {
 
   // ✅ NEW: tránh queue sound khi chưa unlock xong
   private audioReady = false;
+
+  /* ===================== HINT UNIFORM SCALE ===================== */
+  // ✅ 1 scale CHUNG cho tất cả hint (để ảnh chữ dài/ngắn không bị nhỏ/to khác nhau)
+  private hintUniformScale = 1;
+  private hintUniformScaleReady = false;
 
   constructor() {
     super('GameScene');
@@ -266,6 +274,10 @@ export default class GameScene extends Phaser.Scene {
     // ✅ NEW: sync theo flag global
     this.audioReady = !!(window as any)[AUDIO_UNLOCKED_KEY];
 
+    // ✅ reset uniform hint scale mỗi lần init (để layout/resize tính lại đúng)
+    this.hintUniformScale = 1;
+    this.hintUniformScaleReady = false;
+
     const globalKey = '__sortHeightLevels__';
     const totalLevels = 5;
     const savedState = (window as any)[globalKey] as { levels?: SortLevelConfig[] } | undefined;
@@ -290,8 +302,11 @@ export default class GameScene extends Phaser.Scene {
   create() {
     // ✅ iOS/Android: unlock + phát BGM + phát voice lần đầu sau gesture
     this.input.once('pointerdown', async () => {
+      // ✅ FIX: nhớ trạng thái trước khi unlock (để replay không force voice lần nữa)
+      const wasUnlocked = !!(window as any)[AUDIO_UNLOCKED_KEY];
+
       try {
-        if (!(window as any)[AUDIO_UNLOCKED_KEY]) {
+        if (!wasUnlocked) {
           // ✅ await để không “miss” và không queue (đặc biệt khi dragstart ngay lập tức)
           await AudioManager.unlockAndWarmup(['sfx_click', 'sfx_correct', 'sfx_wrong', 'bgm_main']);
           (window as any)[AUDIO_UNLOCKED_KEY] = true;
@@ -304,8 +319,11 @@ export default class GameScene extends Phaser.Scene {
           AudioManager.play('bgm_main');
         }
 
-        // ✅ phát voice hướng dẫn sau unlock (iOS mới cho)
-        this.playVoiceForLevel(true);
+        // ✅ CHỈ force voice khi vừa unlock lần đầu
+        // replay: startLevel() đã play voice rồi => click màn hình không phát lại nữa
+        if (!wasUnlocked) {
+          this.playVoiceForLevel(true);
+        }
       } catch (e) {
         console.warn('[Audio] unlock/play failed', e);
       }
@@ -342,10 +360,7 @@ export default class GameScene extends Phaser.Scene {
       this.currentVoiceId = undefined;
     });
 
-    this.board = this.add
-      .image(0, 0, ASSET.img.board)
-      .setOrigin(0.5)
-      .setDisplaySize(BOARD_WIDTH, BOARD_HEIGHT);
+    this.board = this.add.image(0, 0, ASSET.img.board).setOrigin(0.5).setDisplaySize(BOARD_WIDTH, BOARD_HEIGHT);
 
     this.questionBanner = this.add
       .image(width / 2, BANNER_Y, ASSET.img.questionBanner)
@@ -406,10 +421,12 @@ export default class GameScene extends Phaser.Scene {
 
       this.isDragging = true;
       this.setCanvasCursor('grabbing');
+
       item.prevSlotIndex = item.slotIndex;
       item.dragOffsetX = pointer.worldX - gameObject.x;
-      item.dragFixedY = gameObject.y;
+      item.dragOffsetY = pointer.worldY - gameObject.y;
 
+      // ✅ nếu đang nằm trên slot hàng trên -> nhấc lên thì slot đó trống
       if (item.slotIndex !== null) {
         this.slotAssignments[item.slotIndex] = null;
         item.slotIndex = null;
@@ -434,7 +451,9 @@ export default class GameScene extends Phaser.Scene {
         if (!item) return;
 
         const x = pointer.worldX - item.dragOffsetX;
-        const p = this.clampToBoard(x, item.dragFixedY, item);
+        const y = pointer.worldY - item.dragOffsetY;
+
+        const p = this.clampToBoard(x, y, item);
         gameObject.setPosition(p.x, p.y);
       },
     );
@@ -524,8 +543,6 @@ export default class GameScene extends Phaser.Scene {
       const minX = this.boardX - BOARD_WIDTH / 2 + DRAG_BOARD_PADDING - hitArea.x;
       const maxX = this.boardX + BOARD_WIDTH / 2 - DRAG_BOARD_PADDING - (hitArea.x + hitArea.width);
       const minY = this.boardY - BOARD_HEIGHT / 2 + DRAG_BOARD_PADDING - hitArea.y;
-
-      // ✅ FIX BUG: hitArea.y (không phải hitArea.x)
       const maxY = this.boardY + BOARD_HEIGHT / 2 - DRAG_BOARD_PADDING - (hitArea.y + hitArea.height);
 
       return {
@@ -549,14 +566,72 @@ export default class GameScene extends Phaser.Scene {
     };
   }
 
+  /* ===================== BANNER SIZE NORMALIZE (UNIFORM) ===================== */
+
+  // ✅ tính 1 scale CHUNG cho tất cả hint (dựa trên ảnh dài nhất/cao nhất)
+  private computeHintUniformScale() {
+    const banner = this.questionBanner;
+
+    const targetH = banner.displayHeight * 0.62; // mục tiêu hiển thị theo chiều cao
+    const maxAllowedW = banner.displayWidth * 0.82; // clamp theo bề ngang banner
+
+    const hintKeys = Object.values(ASSET.hint) as string[];
+
+    let maxTexW = 0;
+    let maxTexH = 0;
+
+    for (const key of hintKeys) {
+      if (!this.textures.exists(key)) continue;
+      const tex = this.textures.get(key);
+      const src = tex.getSourceImage() as any;
+
+      const w = (src?.width as number | undefined) ?? 0;
+      const h = (src?.height as number | undefined) ?? 0;
+
+      if (w > maxTexW) maxTexW = w;
+      if (h > maxTexH) maxTexH = h;
+    }
+
+    if (!maxTexW || !maxTexH) {
+      this.hintUniformScale = 1;
+      this.hintUniformScaleReady = true;
+      return;
+    }
+
+    const scaleByH = targetH / maxTexH;
+    const scaleByW = maxAllowedW / maxTexW;
+
+    this.hintUniformScale = Math.min(scaleByH, scaleByW);
+    this.hintUniformScaleReady = true;
+  }
+
+  private applyHintUniformScale(img: Phaser.GameObjects.Image) {
+    if (!this.hintUniformScaleReady) this.computeHintUniformScale();
+    img.setScale(this.hintUniformScale);
+  }
+
   /* ===================== LAYOUT ===================== */
 
   private layoutBoard() {
     const { width } = this.scale;
 
+    // ✅ Banner luôn căn giữa màn game (không đi theo boardX nữa)
+    const bannerX = width / 2;
+
+    // board vẫn giữ offset như logic cũ
     this.boardX = width / 2 + BOARD_OFFSET_X;
-    this.questionBanner.setPosition(this.boardX, BANNER_Y);
-    this.promptText.setPosition(this.questionBanner.x, this.questionBanner.y);
+
+    this.questionBanner.setPosition(bannerX, BANNER_Y);
+    this.promptText.setPosition(bannerX, BANNER_Y);
+
+    // ✅ mỗi lần layout/resize, tính lại uniform scale theo banner hiện tại
+    this.hintUniformScaleReady = false;
+    this.computeHintUniformScale();
+
+    if (this.hintImage) {
+      this.hintImage.setPosition(bannerX, BANNER_Y);
+      if (this.hintImage.visible) this.applyHintUniformScale(this.hintImage);
+    }
 
     const bannerBottom = this.questionBanner.y + this.questionBanner.displayHeight / 2;
     this.boardY = bannerBottom + BOARD_GAP_FROM_BANNER + BOARD_HEIGHT / 2 + BOARD_OFFSET_Y;
@@ -634,9 +709,10 @@ export default class GameScene extends Phaser.Scene {
       ref.setPosition(c.x, c.y);
     });
 
+    // ✅ item nếu đã đặt lên slot trên -> bám slotCenters, còn không -> nằm hàng dưới startCenters
     this.draggableItems.forEach((item) => {
       if (item.slotIndex !== null) {
-        const c = this.startCenters[item.slotIndex];
+        const c = this.slotCenters[item.slotIndex];
         if (c) item.container.setPosition(c.x, c.y);
         return;
       }
@@ -667,8 +743,6 @@ export default class GameScene extends Phaser.Scene {
       const startX = leftX + padding;
       const endX = rightX - padding;
 
-      const isAsc = this.currentDirection === 'ASC';
-
       const arrow = this.directionArrowImage!;
       arrow.setPosition((startX + endX) / 2, midY);
       const desiredW = Math.abs(endX - startX);
@@ -676,7 +750,9 @@ export default class GameScene extends Phaser.Scene {
 
       const baseYScale = 1 * BOARD_SCALE;
       arrow.setScale(desiredW / texW, baseYScale);
-      arrow.setFlipX(!isAsc);
+
+      // ✅ luôn 1 chiều (trái -> phải)
+      arrow.setFlipX(false);
       return;
     }
 
@@ -684,7 +760,7 @@ export default class GameScene extends Phaser.Scene {
     this.directionArrow.setVisible(true);
     this.directionArrow.clear();
 
-    if (this.slotCenters.length < 2 || this.startCenters.length < 2) return;
+    if (this.slotCenters.length < 2) return;
 
     const innerTop = this.boardY - BOARD_HEIGHT / 2 + BOARD_INNER_PADDING_TOP;
     const innerBottom = this.boardY + BOARD_HEIGHT / 2 - BOARD_INNER_PADDING_BOTTOM;
@@ -697,9 +773,9 @@ export default class GameScene extends Phaser.Scene {
     const startX = leftX + padding;
     const endX = rightX - padding;
 
-    const isAsc = this.currentDirection === 'ASC';
-    const fromX = isAsc ? startX : endX;
-    const toX = isAsc ? endX : startX;
+    // ✅ luôn trái -> phải
+    const fromX = startX;
+    const toX = endX;
 
     const lineColor = 0xff4d4d;
     const thickness = 4 * BOARD_SCALE;
@@ -714,11 +790,7 @@ export default class GameScene extends Phaser.Scene {
     const headHeight = 8 * BOARD_SCALE;
 
     this.directionArrow.fillStyle(lineColor, 1);
-    if (isAsc) {
-      this.directionArrow.fillTriangle(toX, midY, toX - headSize, midY - headHeight, toX - headSize, midY + headHeight);
-    } else {
-      this.directionArrow.fillTriangle(toX, midY, toX + headSize, midY - headHeight, toX + headSize, midY + headHeight);
-    }
+    this.directionArrow.fillTriangle(toX, midY, toX - headSize, midY - headHeight, toX - headSize, midY + headHeight);
   }
 
   private getCachedImageScale(theme: SortThemeId, kind: 'ghost' | 'solid', size: number): number | null {
@@ -819,10 +891,11 @@ export default class GameScene extends Phaser.Scene {
   /* ===================== LEVEL GEN ===================== */
 
   private generateLevels(numLevels: number): SortLevelConfig[] {
-    const directions: SortDirection[] = Array.from({ length: numLevels }, (_, i) => (i % 2 === 0 ? 'DESC' : 'ASC'));
+    // ✅ luôn 1 chiều theo mũi tên (ASC)
+    const direction: SortDirection = 'ASC';
     const themes = Phaser.Utils.Array.Shuffle(SORT_THEMES.map((x) => x.id));
 
-    return directions.map((direction, i) => ({
+    return Array.from({ length: numLevels }, (_, i) => ({
       id: i + 1,
       direction,
       theme: themes[i % themes.length],
@@ -845,7 +918,7 @@ export default class GameScene extends Phaser.Scene {
     this.levelVoicePlayed = false;
 
     const level = this.levels[this.levelIndex];
-    this.currentDirection = level.direction;
+    this.currentDirection = level.direction; // vẫn giữ logic direction, nhưng level gen đã là ASC
     this.currentTheme = level.theme ?? 'BUILDING';
     this.currentLevelItemIds =
       level.itemIds?.length === 3 ? level.itemIds : [makeItemId(this.currentTheme, 1), makeItemId(this.currentTheme, 2), makeItemId(this.currentTheme, 3)];
@@ -874,18 +947,19 @@ export default class GameScene extends Phaser.Scene {
 
     if (hintKey && this.textures.exists(hintKey)) {
       this.promptText.setVisible(false);
+
+      // ✅ luôn bám theo banner (banner đã căn giữa màn trong layoutBoard)
+      const bx = this.questionBanner.x;
+      const by = this.questionBanner.y;
+
       if (!this.hintImage) {
-        this.hintImage = this.add.image(this.questionBanner.x, this.questionBanner.y, hintKey).setOrigin(0.5).setDepth(21);
+        this.hintImage = this.add.image(bx, by, hintKey).setOrigin(0.5).setDepth(21);
       } else {
-        this.hintImage.setTexture(hintKey).setPosition(this.questionBanner.x, this.questionBanner.y).setVisible(true);
+        this.hintImage.setTexture(hintKey).setPosition(bx, by).setVisible(true);
       }
 
-      const maxW = this.questionBanner.displayWidth * 0.8;
-      const maxH = this.questionBanner.displayHeight * 0.65;
-      const texW = this.hintImage.width || 1;
-      const texH = this.hintImage.height || 1;
-      const scale = Math.min(maxW / texW, maxH / texH);
-      this.hintImage.setScale(scale);
+      // ✅ áp scale CHUNG => 5 ảnh chữ dài/ngắn sẽ luôn cùng “cỡ”
+      this.applyHintUniformScale(this.hintImage);
       return;
     }
 
@@ -924,10 +998,13 @@ export default class GameScene extends Phaser.Scene {
 
   private buildSortLevel() {
     const slotCount = this.currentLevelItemIds.length || 3;
+
+    // ✅ slotAssignments giờ là "hàng trên"
     this.slotAssignments = Array.from({ length: slotCount }, () => null);
 
     const slotSize = this.slotSize;
 
+    // ghost (ảnh gợi ý) ở hàng trên
     const expected = this.getExpectedOrder();
     this.referenceItems = expected.map((id, i) => {
       const def = getItemDef(id);
@@ -947,6 +1024,7 @@ export default class GameScene extends Phaser.Scene {
       else ids.reverse();
     }
 
+    // draggable (ảnh thật) ở hàng dưới, chưa chiếm slot trên
     this.draggableItems = ids.map((id, i) => {
       const def = getItemDef(id);
       const start = this.startCenters[i] ?? this.startCenters[0] ?? { x: this.boardX, y: this.boardY };
@@ -975,15 +1053,16 @@ export default class GameScene extends Phaser.Scene {
         id,
         container,
         startIndex: i,
-        slotIndex: i,
+
+        slotIndex: null, // ✅ NEW: chưa đặt lên slot hàng trên
         prevSlotIndex: null,
+
         dragClampRect: Phaser.Geom.Rectangle.Clone(hitRect),
         dragOffsetX: 0,
-        dragFixedY: start.y,
+        dragOffsetY: 0,
       };
 
       this.itemByContainer.set(container, item);
-      this.slotAssignments[i] = item;
       return item;
     });
   }
@@ -1003,14 +1082,16 @@ export default class GameScene extends Phaser.Scene {
   /* ===================== DRAG/SNAP ===================== */
 
   private restoreToPreviousPosition(item: DraggableItem) {
+    // ✅ nếu trước đó đang ở slot hàng trên -> trả về slot hàng trên
     if (item.prevSlotIndex !== null) {
-      const c = this.startCenters[item.prevSlotIndex];
+      const c = this.slotCenters[item.prevSlotIndex];
       if (c) item.container.setPosition(c.x, c.y);
       item.slotIndex = item.prevSlotIndex;
       this.slotAssignments[item.prevSlotIndex] = item;
       return;
     }
 
+    // ✅ còn lại trả về hàng dưới (start)
     const start = this.startCenters[item.startIndex] ?? this.startCenters[0] ?? { x: this.boardX, y: this.boardY };
     item.container.setPosition(start.x, start.y);
     item.slotIndex = null;
@@ -1021,10 +1102,11 @@ export default class GameScene extends Phaser.Scene {
 
     const threshold = this.slotSize * 0.65;
 
+    // ✅ snap vào slot hàng trên (slotCenters)
     let bestIdx = -1;
     let bestDist = Infinity;
-    for (let i = 0; i < this.startCenters.length; i++) {
-      const c = this.startCenters[i];
+    for (let i = 0; i < this.slotCenters.length; i++) {
+      const c = this.slotCenters[i];
       if (!c) continue;
       const d = Phaser.Math.Distance.Between(item.container.x, item.container.y, c.x, c.y);
       if (d < bestDist) {
@@ -1035,15 +1117,16 @@ export default class GameScene extends Phaser.Scene {
 
     if (bestIdx < 0 || bestDist > threshold) return false;
 
-    const targetCenter = this.startCenters[bestIdx];
+    const targetCenter = this.slotCenters[bestIdx];
     if (!targetCenter) return false;
 
     const occupant = this.slotAssignments[bestIdx];
     const prevSlot = item.prevSlotIndex;
 
+    // ✅ nếu slot đã có item khác -> swap/đẩy về chỗ cũ
     if (occupant && occupant !== item) {
       if (prevSlot !== null) {
-        const prevCenter = this.startCenters[prevSlot];
+        const prevCenter = this.slotCenters[prevSlot];
         if (prevCenter) occupant.container.setPosition(prevCenter.x, prevCenter.y);
         occupant.slotIndex = prevSlot;
         this.slotAssignments[prevSlot] = occupant;
