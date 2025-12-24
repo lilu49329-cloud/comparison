@@ -1,6 +1,10 @@
 import Phaser from 'phaser';
 import AudioManager from './AudioManager';
 
+/* ===================== AUDIO GLOBAL FLAG ===================== */
+// ✅ dùng window để nhớ “đã unlock audio” xuyên scene / replay
+const AUDIO_UNLOCKED_KEY = '__audioUnlocked__';
+
 /* ===================== TYPES ===================== */
 
 type GameState = 'WAIT_DRAG' | 'LEVEL_END';
@@ -278,13 +282,25 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create() {
-    this.input.once('pointerdown', () => {
-      AudioManager.unlockAndWarmup(['sfx_click', 'sfx_correct', 'sfx_wrong']);
-      // ✅ chỉ bật bgm 1 lần thôi
-    if (!AudioManager.isPlaying('bgm_main')) {
-      AudioManager.play('bgm_main');
-    }
+    // ✅ iOS/Android: unlock + phát BGM + phát voice lần đầu sau gesture
+    this.input.once('pointerdown', async () => {
+      try {
+        if (!(window as any)[AUDIO_UNLOCKED_KEY]) {
+          // ✅ await để Android/Chrome không “miss” phát đầu
+          await AudioManager.unlockAndWarmup(['sfx_click', 'sfx_correct', 'sfx_wrong', 'bgm_main']);
+          (window as any)[AUDIO_UNLOCKED_KEY] = true;
+        }
 
+        // ✅ chỉ bật bgm 1 lần thôi (kể cả replay/scene recreate)
+        if (!AudioManager.isPlaying('bgm_main')) {
+          AudioManager.play('bgm_main');
+        }
+
+        // ✅ phát voice hướng dẫn sau unlock (iOS mới cho)
+        this.playVoiceForLevel(true);
+      } catch (e) {
+        console.warn('[Audio] unlock/play failed', e);
+      }
     });
 
     try {
@@ -858,7 +874,11 @@ export default class GameScene extends Phaser.Scene {
     this.buildSortLevel();
 
     this.updateHintForLevel();
-    this.playVoiceForLevel();
+
+    // ✅ chỉ phát voice nếu audio đã unlock (iOS/Android an toàn)
+    if ((window as any)[AUDIO_UNLOCKED_KEY]) {
+      this.playVoiceForLevel();
+    }
   }
 
   private updateHintForLevel() {
@@ -955,7 +975,7 @@ export default class GameScene extends Phaser.Scene {
 
       // ✅ set hitbox RỘNG + clampRect theo hitbox
       const hitRect = this.setDragHitArea(container);
-      if ((container.input as Phaser.Types.Input.InteractiveObject | undefined)) {
+      if (container.input as Phaser.Types.Input.InteractiveObject | undefined) {
         (container.input as Phaser.Types.Input.InteractiveObject).cursor = 'grab';
       }
 
