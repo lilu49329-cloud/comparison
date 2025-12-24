@@ -233,6 +233,9 @@ export default class GameScene extends Phaser.Scene {
   private imageScaleCache = new Map<string, number>();
   private isDragging = false;
 
+  // ✅ NEW: tránh queue sound khi chưa unlock xong
+  private audioReady = false;
+
   constructor() {
     super('GameScene');
   }
@@ -260,6 +263,9 @@ export default class GameScene extends Phaser.Scene {
     this.itemByContainer.clear();
     this.isDragging = false;
 
+    // ✅ NEW: sync theo flag global
+    this.audioReady = !!(window as any)[AUDIO_UNLOCKED_KEY];
+
     const globalKey = '__sortHeightLevels__';
     const totalLevels = 5;
     const savedState = (window as any)[globalKey] as { levels?: SortLevelConfig[] } | undefined;
@@ -286,10 +292,12 @@ export default class GameScene extends Phaser.Scene {
     this.input.once('pointerdown', async () => {
       try {
         if (!(window as any)[AUDIO_UNLOCKED_KEY]) {
-          // ✅ await để Android/Chrome không “miss” phát đầu
+          // ✅ await để không “miss” và không queue (đặc biệt khi dragstart ngay lập tức)
           await AudioManager.unlockAndWarmup(['sfx_click', 'sfx_correct', 'sfx_wrong', 'bgm_main']);
           (window as any)[AUDIO_UNLOCKED_KEY] = true;
         }
+
+        this.audioReady = true;
 
         // ✅ chỉ bật bgm 1 lần thôi (kể cả replay/scene recreate)
         if (!AudioManager.isPlaying('bgm_main')) {
@@ -408,7 +416,11 @@ export default class GameScene extends Phaser.Scene {
       }
 
       gameObject.setDepth(50);
-      AudioManager.play(ASSET.sfx.click);
+
+      // ✅ IMPORTANT: chỉ play click khi audioReady (tránh queue -> iOS xả dồn)
+      if (this.audioReady) {
+        AudioManager.play(ASSET.sfx.click);
+      }
     });
 
     this.input.on(
@@ -662,7 +674,6 @@ export default class GameScene extends Phaser.Scene {
       const desiredW = Math.abs(endX - startX);
       const texW = arrow.width || 1;
 
-      // Stretch horizontally without blowing up the arrow height
       const baseYScale = 1 * BOARD_SCALE;
       arrow.setScale(desiredW / texW, baseYScale);
       arrow.setFlipX(!isAsc);
@@ -704,23 +715,9 @@ export default class GameScene extends Phaser.Scene {
 
     this.directionArrow.fillStyle(lineColor, 1);
     if (isAsc) {
-      this.directionArrow.fillTriangle(
-        toX,
-        midY,
-        toX - headSize,
-        midY - headHeight,
-        toX - headSize,
-        midY + headHeight,
-      );
+      this.directionArrow.fillTriangle(toX, midY, toX - headSize, midY - headHeight, toX - headSize, midY + headHeight);
     } else {
-      this.directionArrow.fillTriangle(
-        toX,
-        midY,
-        toX + headSize,
-        midY - headHeight,
-        toX + headSize,
-        midY + headHeight,
-      );
+      this.directionArrow.fillTriangle(toX, midY, toX + headSize, midY - headHeight, toX + headSize, midY + headHeight);
     }
   }
 
@@ -768,7 +765,6 @@ export default class GameScene extends Phaser.Scene {
       return [img];
     }
 
-    // fallback shapes
     const maxRank = 3;
     const t = (def.rank - 1) / (maxRank - 1);
 
@@ -787,9 +783,7 @@ export default class GameScene extends Phaser.Scene {
       return [silhouette];
     }
 
-    const base = this.add
-      .rectangle(0, bottomY + 6 * BOARD_SCALE, width * 1.2, 10 * BOARD_SCALE, 0x0b1d35)
-      .setAlpha(0.55);
+    const base = this.add.rectangle(0, bottomY + 6 * BOARD_SCALE, width * 1.2, 10 * BOARD_SCALE, 0x0b1d35).setAlpha(0.55);
     const body = this.add.rectangle(0, bottomY, width, height, mainColor).setOrigin(0.5, 1).setAlpha(alpha);
 
     const roof = this.add
@@ -817,9 +811,7 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    const shine = this.add
-      .rectangle(-width * 0.18, bottomY - height * 0.55, width * 0.12, height * 0.7, 0xffffff)
-      .setAlpha(0.14);
+    const shine = this.add.rectangle(-width * 0.18, bottomY - height * 0.55, width * 0.12, height * 0.7, 0xffffff).setAlpha(0.14);
 
     return [base, body, roof, shine, ...windows];
   }
@@ -834,11 +826,7 @@ export default class GameScene extends Phaser.Scene {
       id: i + 1,
       direction,
       theme: themes[i % themes.length],
-      itemIds: [
-        makeItemId(themes[i % themes.length], 1),
-        makeItemId(themes[i % themes.length], 2),
-        makeItemId(themes[i % themes.length], 3),
-      ],
+      itemIds: [makeItemId(themes[i % themes.length], 1), makeItemId(themes[i % themes.length], 2), makeItemId(themes[i % themes.length], 3)],
     }));
   }
 
@@ -846,10 +834,7 @@ export default class GameScene extends Phaser.Scene {
 
   private startLevel() {
     if (this.levelIndex >= this.levels.length) {
-      this.scene.start('EndGameScene', {
-        score: this.score,
-        total: this.levels.length,
-      });
+      this.scene.start('EndGameScene', { score: this.score, total: this.levels.length });
       return;
     }
 
@@ -857,16 +842,13 @@ export default class GameScene extends Phaser.Scene {
     this.subgameDone = false;
     this.gameState = 'WAIT_DRAG';
 
-    // ✅ reset voice lock mỗi level
     this.levelVoicePlayed = false;
 
     const level = this.levels[this.levelIndex];
     this.currentDirection = level.direction;
     this.currentTheme = level.theme ?? 'BUILDING';
     this.currentLevelItemIds =
-      level.itemIds?.length === 3
-        ? level.itemIds
-        : [makeItemId(this.currentTheme, 1), makeItemId(this.currentTheme, 2), makeItemId(this.currentTheme, 3)];
+      level.itemIds?.length === 3 ? level.itemIds : [makeItemId(this.currentTheme, 1), makeItemId(this.currentTheme, 2), makeItemId(this.currentTheme, 3)];
 
     this.resetUiForNewTry();
     this.clearLevelObjects();
@@ -875,8 +857,8 @@ export default class GameScene extends Phaser.Scene {
 
     this.updateHintForLevel();
 
-    // ✅ chỉ phát voice nếu audio đã unlock (iOS/Android an toàn)
-    if ((window as any)[AUDIO_UNLOCKED_KEY]) {
+    // ✅ chỉ phát voice nếu audio đã unlock
+    if (this.audioReady) {
       this.playVoiceForLevel();
     }
   }
@@ -911,7 +893,6 @@ export default class GameScene extends Phaser.Scene {
     this.promptText.setVisible(true).setText(fallback);
   }
 
-  // ✅ anti-spam voice: chỉ quản guide voice; không ảnh hưởng sfx/correct-answer
   private playVoiceForLevel(force = false) {
     const voiceId = ASSET.voice[this.currentTheme];
     if (!voiceId) return;
@@ -926,11 +907,12 @@ export default class GameScene extends Phaser.Scene {
     this.levelVoicePlayed = true;
     this.voiceCooldownUntil = now + this.VOICE_COOLDOWN_MS;
 
-    // ✅ chỉ stop guide voice cũ
     this.stopGuideVoice();
     this.currentVoiceId = voiceId;
 
-    AudioManager.play(voiceId);
+    if (this.audioReady) {
+      AudioManager.play(voiceId);
+    }
   }
 
   private resetUiForNewTry() {
@@ -969,11 +951,8 @@ export default class GameScene extends Phaser.Scene {
       const def = getItemDef(id);
       const start = this.startCenters[i] ?? this.startCenters[0] ?? { x: this.boardX, y: this.boardY };
 
-      const container = this.add
-        .container(start.x, start.y, this.createBuildingChildren(def, slotSize, 'solid'))
-        .setDepth(30);
+      const container = this.add.container(start.x, start.y, this.createBuildingChildren(def, slotSize, 'solid')).setDepth(30);
 
-      // ✅ set hitbox RỘNG + clampRect theo hitbox
       const hitRect = this.setDragHitArea(container);
       if (container.input as Phaser.Types.Input.InteractiveObject | undefined) {
         (container.input as Phaser.Types.Input.InteractiveObject).cursor = 'grab';
@@ -1112,7 +1091,6 @@ export default class GameScene extends Phaser.Scene {
     if (this.gameState !== 'WAIT_DRAG') return;
     this.gameState = 'LEVEL_END';
 
-    // ✅ chỉ ngắt voice hướng dẫn, không ngắt sfx/correct-answer
     this.stopGuideVoice();
 
     this.score++;
@@ -1121,8 +1099,10 @@ export default class GameScene extends Phaser.Scene {
     this.feedbackText.setText('Đúng rồi!');
     this.resultBadge.setTexture(ASSET.img.resultCorrect).setVisible(true);
 
-    AudioManager.play(ASSET.sfx.correct);
-    AudioManager.playCorrectAnswer();
+    if (this.audioReady) {
+      AudioManager.play(ASSET.sfx.correct);
+      AudioManager.playCorrectAnswer();
+    }
 
     this.draggableItems.forEach((x) => x.container.disableInteractive());
 
@@ -1133,12 +1113,14 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private onWrong() {
-    // ✅ chỉ ngắt voice hướng dẫn, không ngắt sfx
     this.stopGuideVoice();
 
     this.feedbackText.setText('Thử lại nhé!');
     this.resultBadge.setTexture(ASSET.img.resultWrong).setVisible(true);
-    AudioManager.play(ASSET.sfx.wrong);
+
+    if (this.audioReady) {
+      AudioManager.play(ASSET.sfx.wrong);
+    }
 
     this.time.delayedCall(700, () => {
       if (this.gameState !== 'WAIT_DRAG') return;

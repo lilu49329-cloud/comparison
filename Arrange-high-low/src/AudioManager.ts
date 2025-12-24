@@ -70,8 +70,8 @@
         keys.forEach((key) => {
             const config = SOUND_MAP[key];
 
-            // ✅ iOS: default html5=true để "chắc phát" trong iframe/safari
-            // ✅ non-iOS: default html5=false (WebAudio preload tốt)
+            // ✅ GIỮ NGUYÊN logic cũ: iOS mặc định html5=true
+            // (Fix “xả dồn” sẽ nằm ở unlock/play bên dưới)
             const defaultHtml5 = isIOS() ? true : false;
 
             this.sounds[key] = new Howl({
@@ -98,7 +98,7 @@
     /**
      * ✅ Gọi 1 lần sau "user gesture" (tap/click) để:
      * - resume audio context (WebAudio)
-     * - warmup sfx html5 (để lần đầu không delay)
+     * - warmup (non-iOS: silent-play; iOS: chỉ load để tránh queue rồi xả dồn)
      */
     async unlockAndWarmup(ids: string[] = ['sfx_click', 'sfx_correct', 'sfx_wrong']) {
         if (this.unlocked || this.unlocking) return;
@@ -113,10 +113,18 @@
             } catch {}
         }
 
-        // warmup: load + play 0 volume 1 nhịp (chạy trong gesture => iOS cho phép)
-        await Promise.all(
-            ids.map((id) => this.warmupOne(id).catch(() => undefined)),
-        );
+        // ✅ FIX iOS: KHÔNG silent-play khi warmup (tránh iOS xả dồn nhiều âm)
+        if (isIOS()) {
+            ids.forEach((id) => {
+            const sound = this.sounds[id];
+            if (!sound) return;
+            const state = (sound as any).state?.() as 'unloaded' | 'loading' | 'loaded' | undefined;
+            if (state === 'unloaded') sound.load();
+            });
+        } else {
+            // non-iOS: warmup thật để giảm latency
+            await Promise.all(ids.map((id) => this.warmupOne(id).catch(() => undefined)));
+        }
 
         this.unlocked = true;
         } finally {
@@ -138,10 +146,12 @@
             const sid = sound.play();
             // stop rất nhanh để không nghe “tạch”
             setTimeout(() => {
-            try { sound.stop(sid as any); } catch {}
+            try {
+                sound.stop(sid as any);
+            } catch {}
             sound.volume(originalVol);
             resolve();
-            }, 50);
+            }, 30);
         };
 
         if (state === 'loaded' || state === undefined) {
@@ -158,6 +168,9 @@
     }
 
     play(id: string): number | undefined {
+        // ✅ FIX: đang unlock thì bỏ qua (đừng queue play trong lúc iOS “mở khóa”)
+        if (this.unlocking) return;
+
         const now = Date.now();
         const cooldown = this.getCooldown(id);
         const lastTime = this.lastPlayTimes[id] ?? 0;
@@ -170,12 +183,10 @@
         }
 
         const state = (sound as any).state?.() as 'unloaded' | 'loading' | 'loaded' | undefined;
+
+        // ✅ FIX: nếu chưa load xong -> chỉ trigger load 1 lần rồi BỎ QUA
+        // (KHÔNG sound.once('load', () => play()) vì spam sẽ bị xả dồn)
         if (state && state !== 'loaded') {
-        sound.off('load');
-        sound.once('load', () => {
-            this.lastPlayTimes[id] = Date.now();
-            sound.play();
-        });
         if (state === 'unloaded') sound.load();
         return;
         }
@@ -194,6 +205,9 @@
         src: string,
         opts?: { loop?: boolean; volume?: number; html5?: boolean },
     ): number | undefined {
+        // ✅ FIX tương tự: đang unlock thì bỏ qua để tránh queue
+        if (this.unlocking) return;
+
         const now = Date.now();
         const cooldown = this.getCooldown(id);
         const lastTime = this.lastPlayTimes[id] ?? 0;
@@ -222,12 +236,8 @@
         const sound = this.sounds[id];
         const state = (sound as any).state?.() as 'unloaded' | 'loading' | 'loaded' | undefined;
 
+        // ✅ FIX: không queue play khi đang loading
         if (state && state !== 'loaded') {
-        sound.off('load');
-        sound.once('load', () => {
-            this.lastPlayTimes[id] = Date.now();
-            sound.play();
-        });
         if (state === 'unloaded') sound.load();
         return;
         }
@@ -253,11 +263,15 @@
 
     private getCooldown(id: string): number {
         switch (id) {
-        case 'sfx_click': return 200;
-        case 'voice_intro': return 3000;
+        case 'sfx_click':
+            return 200;
+        case 'voice_intro':
+            return 3000;
         case 'voice_complete':
-        case 'complete': return 1500;
-        default: return 0;
+        case 'complete':
+            return 1500;
+        default:
+            return 0;
         }
     }
 
