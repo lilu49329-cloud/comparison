@@ -1,0 +1,840 @@
+import Phaser from 'phaser';
+import AudioManager from './AudioManager';
+
+/* ===================== TYPES ===================== */
+
+type GameState = 'INTRO' | 'DRAGGING' | 'CHECKING' | 'LEVEL_END';
+
+type LeftItemId = 'HAND_SMALL' | 'HAND_BIG' | 'FEET_SMALL' | 'FEET_BIG';
+type RightItemId = 'GLOVE_SMALL' | 'GLOVE_BIG' | 'SHOE_SMALL' | 'SHOE_BIG';
+type ItemId = LeftItemId | RightItemId;
+type MatchKey = LeftItemId;
+
+type WindowGameApi = {
+  setRandomGameViewportBg?: () => void;
+  setGameButtonsVisible?: (visible: boolean) => void;
+} & Record<string, unknown>;
+
+/* ===================== ASSETS ===================== */
+
+const ITEM_TEXTURE: Record<ItemId, string> = {
+  HAND_SMALL: 'hand_small',
+  HAND_BIG: 'hand_big',
+  FEET_SMALL: 'feet_small',
+  FEET_BIG: 'feet_big',
+  GLOVE_SMALL: 'glove_small',
+  GLOVE_BIG: 'glove_big',
+  SHOE_SMALL: 'shoe_small',
+  SHOE_BIG: 'shoe_big',
+};
+
+const CONNECT_LINE_KEY = 'connect_line';
+const HINT_IMG_KEY = 'connect_hint';
+const ITEMS_BOARD_KEY = 'banner_question';
+
+const LEFT_IDS: readonly LeftItemId[] = ['HAND_SMALL', 'HAND_BIG', 'FEET_SMALL', 'FEET_BIG'] as const;
+const RIGHT_IDS: readonly RightItemId[] = ['GLOVE_SMALL', 'GLOVE_BIG', 'SHOE_SMALL', 'SHOE_BIG'] as const;
+
+const RIGHT_MATCH_KEY: Record<RightItemId, MatchKey> = {
+  GLOVE_SMALL: 'HAND_SMALL',
+  GLOVE_BIG: 'HAND_BIG',
+  SHOE_SMALL: 'FEET_SMALL',
+  SHOE_BIG: 'FEET_BIG',
+};
+
+/* ===================== SCALE ===================== */
+
+const ITEM_SCALE = 2.0;
+const PROMPT_IMG_SCALE = 0.55;
+const LINE_THICKNESS = 12;
+const LINE_END_EXTEND = 5;
+const LINE_DRAG_START_EXTEND = 10;
+const ITEM_FILL_RATIO = 0.9;
+const ITEMS_SHIFT_FROM_BANNER = 25;
+
+/* ===================== HOLE ANCHOR ===================== */
+
+// Lỗ tròn (tính theo pixel của ảnh gốc).
+// Left column (HAND/FEET): Left=63, Top=126, W/H=40 (rotation -180° doesn't matter because we do not rotate the sprite)
+// Right column (GLOVE/SHOE): Left=472, Top=126, W/H=40
+const HOLE_BOX_LEFT = { left: 63, top: 126, width: 40, height: 40 } as const;
+const HOLE_BOX_RIGHT = { left: 472, top: 126, width: 40, height: 40 } as const;
+
+/* ===================== LAYOUT ===================== */
+
+const BANNER_Y = 60;
+const BANNER_SCALE = 0.52;
+const BANNER_MAX_W_RATIO = 0.6;
+
+const PROMPT_FONT_SIZE = 30;
+const FEEDBACK_FONT_SIZE = 22;
+const FEEDBACK_BOTTOM_MARGIN = 40;
+
+const SIDE_CHAR_KEY = 'char';
+const SIDE_CHAR_BASE_SCALE = 0.4;
+const SIDE_CHAR_BOARD_GAP_MIN = 16;
+const SIDE_CHAR_BOARD_GAP_RATIO = 0.02;
+const SIDE_CHAR_BOARD_MAX_H_RATIO = 0.95;
+const SIDE_CHAR_BOB_RATIO = 0.015;
+
+const ITEMS_GAP_FROM_BANNER = 70;
+const ITEMS_GAP_FROM_FEEDBACK = 60;
+
+const COLUMN_GAP_RATIO = 0.38;
+const COLUMN_GAP_MIN = 220;
+const COLUMN_GAP_MAX = 520;
+
+const ITEMS_BOARD_PAD_X = 50;
+const ITEMS_BOARD_PAD_Y = 20;
+const ITEMS_BOARD_DEPTH = 4;
+
+const ITEM_DEPTH = 5;
+const LINE_DEPTH = 6;
+const LINE_CAP_RADIUS = Math.max(3, LINE_THICKNESS * 0.55);
+const CHAR_DEPTH = 5;
+
+/* ===================== SCENE ===================== */
+
+export default class GameScene extends Phaser.Scene {
+  public score = 0;
+
+  private gameState: GameState = 'INTRO';
+  private hasQueuedQuestionVoiceUnlock = false;
+  private hasPlayedInstructionVoice = false;
+  private currentItemScale = ITEM_SCALE;
+
+  private promptText!: Phaser.GameObjects.Text;
+  private promptImage?: Phaser.GameObjects.Image;
+  private feedbackText!: Phaser.GameObjects.Text;
+  private questionBanner!: Phaser.GameObjects.Image;
+  private itemsBoard?: Phaser.GameObjects.Image;
+
+  private sideCharacter?: Phaser.GameObjects.Image;
+
+  private leftOrder: LeftItemId[] = [];
+  private rightOrder: RightItemId[] = [];
+
+  private leftItems: Phaser.GameObjects.Image[] = [];
+  private rightItems: Phaser.GameObjects.Image[] = [];
+
+  private matched = new Set<MatchKey>();
+  private matchedLines = new Map<MatchKey, Phaser.GameObjects.Image>();
+  private lineCaps = new Map<Phaser.GameObjects.Image, { start: Phaser.GameObjects.Arc; end: Phaser.GameObjects.Arc }>();
+
+  private draggingKey?: MatchKey;
+  private draggingSide?: 'LEFT' | 'RIGHT';
+  private dragLineEnd?: Phaser.Math.Vector2;
+  private draggingLine?: Phaser.GameObjects.Image;
+  private wrongLine?: Phaser.GameObjects.Image;
+  private wrongLineSeg?: { x1: number; y1: number; x2: number; y2: number };
+
+  constructor() {
+    super('GameScene');
+  }
+
+  /* ===================== INIT ===================== */
+
+  init(data: { score?: number }) {
+    this.score = data.score ?? 0;
+    this.promptImage = undefined;
+    this.hasQueuedQuestionVoiceUnlock = false;
+    this.hasPlayedInstructionVoice = false;
+    this.matched.clear();
+    this.draggingKey = undefined;
+    this.dragLineEnd = undefined;
+    this.wrongLine = undefined;
+    this.wrongLineSeg = undefined;
+    this.gameState = 'INTRO';
+  }
+
+  /* ===================== CREATE ===================== */
+
+  create() {
+    try {
+      (window as unknown as WindowGameApi).setRandomGameViewportBg?.();
+    } catch {
+      // Optional host helper may not exist.
+    }
+
+    const { width, height } = this.scale;
+    const w = window as unknown as WindowGameApi;
+    w.setGameButtonsVisible?.(true);
+    w.setRandomGameViewportBg?.();
+
+    const replayBtnEl = document.getElementById('btn-replay') as HTMLButtonElement | null;
+    const nextBtnEl = document.getElementById('btn-next') as HTMLButtonElement | null;
+
+    const setBtnBgFromUrl = (el: HTMLButtonElement | null, url?: string) => {
+      if (!el || !url) return;
+      el.style.backgroundImage = `url("${url}")`;
+      el.style.backgroundRepeat = 'no-repeat';
+      el.style.backgroundPosition = 'center';
+      el.style.backgroundSize = 'contain';
+    };
+
+    setBtnBgFromUrl(replayBtnEl, 'assets/button/replay.png');
+    setBtnBgFromUrl(nextBtnEl, 'assets/button/next.png');
+
+    this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
+
+    this.questionBanner = this.add
+      .image(width / 2, BANNER_Y, 'btn_primary_pressed')
+      .setOrigin(0.5)
+      .setScale(0.55, BANNER_SCALE)
+      .setDepth(20);
+
+    this.promptText = this.add
+      .text(this.questionBanner.x, this.questionBanner.y, '', {
+        fontFamily: 'Fredoka, Arial',
+        fontSize: `${PROMPT_FONT_SIZE}px`,
+        color: '#ffffff',
+      })
+      .setOrigin(0.5)
+      .setDepth(21);
+
+    if (this.textures.exists(ITEMS_BOARD_KEY)) {
+      this.itemsBoard = this.add
+        .image(width / 2, height / 2, ITEMS_BOARD_KEY)
+        .setOrigin(0.5)
+        .setDepth(ITEMS_BOARD_DEPTH)
+        .setAlpha(0.95)
+        .setVisible(true);
+    } else {
+      this.itemsBoard = undefined;
+    }
+
+    this.feedbackText = this.add
+      .text(0, 0, '', {
+        fontFamily: 'Fredoka, Arial',
+        fontSize: `${FEEDBACK_FONT_SIZE}px`,
+        color: '#ffffff',
+      })
+      .setOrigin(0.5);
+
+    if (this.textures.exists(SIDE_CHAR_KEY)) {
+      this.sideCharacter = this.add.image(0, 0, SIDE_CHAR_KEY).setOrigin(0.5, 1).setDepth(CHAR_DEPTH);
+    } else {
+      this.sideCharacter = undefined;
+    }
+
+    this.scale.off('resize', this.layoutScene, this);
+    this.scale.on('resize', this.layoutScene, this);
+
+    this.buildConnectBoard();
+    this.layoutScene();
+    this.startRound();
+  }
+
+  /* ===================== AUDIO ===================== */
+
+  private ensureQuestionAudioUnlockedThenPlay() {
+    const audioUnlockedKey = '__questionAudioUnlocked__';
+    const w = window as unknown as WindowGameApi;
+    const audioUnlocked = Boolean(w[audioUnlockedKey]);
+
+    if (audioUnlocked) return;
+    if (this.hasQueuedQuestionVoiceUnlock) return;
+    this.hasQueuedQuestionVoiceUnlock = true;
+
+    this.input.once('pointerdown', () => {
+      w[audioUnlockedKey] = true;
+      this.hasQueuedQuestionVoiceUnlock = false;
+    });
+  }
+
+  private playInstructionVoiceOnce() {
+    if (this.hasPlayedInstructionVoice) return;
+
+    const audioUnlockedKey = '__questionAudioUnlocked__';
+    const w = window as unknown as WindowGameApi;
+    const audioUnlocked = Boolean(w[audioUnlockedKey]);
+
+    const play = () => {
+      if (this.hasPlayedInstructionVoice) return;
+      AudioManager.play('voice_join');
+      this.hasPlayedInstructionVoice = true;
+      // Nếu bé click/drag nhanh sau khi voice chạy thì cắt voice để tránh gây khó chịu.
+      this.input.once('pointerdown', () => AudioManager.stop('voice_join'));
+    };
+
+    if (audioUnlocked) {
+      play();
+      return;
+    }
+
+    this.ensureQuestionAudioUnlockedThenPlay();
+    this.input.once('pointerdown', () => {
+      w[audioUnlockedKey] = true;
+      play();
+    });
+  }
+
+  /* ===================== BUILD ITEMS ===================== */
+
+  private buildConnectBoard() {
+    this.leftItems.forEach((i) => i.destroy());
+    this.rightItems.forEach((i) => i.destroy());
+    this.leftItems = [];
+    this.rightItems = [];
+
+    this.matchedLines.forEach((l) => this.destroyLineCaps(l));
+    this.matchedLines.forEach((l) => l.destroy());
+    this.matchedLines.clear();
+    this.draggingLine && this.destroyLineCaps(this.draggingLine);
+    this.draggingLine?.destroy();
+    this.draggingLine = undefined;
+    this.wrongLine && this.destroyLineCaps(this.wrongLine);
+    this.wrongLine?.destroy();
+    this.wrongLine = undefined;
+
+    this.leftOrder = [...LEFT_IDS];
+    this.rightOrder = [...RIGHT_IDS];
+    Phaser.Utils.Array.Shuffle(this.leftOrder);
+    Phaser.Utils.Array.Shuffle(this.rightOrder);
+
+    for (const id of this.leftOrder) {
+      const img = this.add
+        .image(0, 0, ITEM_TEXTURE[id])
+        .setOrigin(0.5)
+        .setScale(this.currentItemScale)
+        .setDepth(ITEM_DEPTH);
+      img.setData('itemId', id);
+      img.setData('matchKey', id);
+      img.setData('holeSide', 'LEFT');
+      img.setInteractive({ useHandCursor: true, draggable: true });
+      this.input.setDraggable(img);
+      this.leftItems.push(img);
+    }
+
+    for (const id of this.rightOrder) {
+      const img = this.add
+        .image(0, 0, ITEM_TEXTURE[id])
+        .setOrigin(0.5)
+        .setScale(this.currentItemScale)
+        .setDepth(ITEM_DEPTH);
+      img.setData('itemId', id);
+      img.setData('matchKey', RIGHT_MATCH_KEY[id]);
+      img.setData('holeSide', 'RIGHT');
+      img.setInteractive({ useHandCursor: true, draggable: true });
+      this.input.setDraggable(img);
+      this.rightItems.push(img);
+    }
+
+    this.input.removeAllListeners('dragstart');
+    this.input.removeAllListeners('drag');
+    this.input.removeAllListeners('dragend');
+
+    this.input.on('dragstart', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject) => {
+      AudioManager.stop('voice_join');
+      const img = gameObject as Phaser.GameObjects.Image;
+      const matchKey = img.getData('matchKey') as MatchKey | undefined;
+      if (!matchKey || this.matched.has(matchKey) || this.gameState === 'LEVEL_END') return;
+
+      AudioManager.play('sfx_click');
+      this.draggingKey = matchKey;
+      this.draggingSide = (img.getData('holeSide') as 'LEFT' | 'RIGHT' | undefined) ?? 'LEFT';
+      this.dragLineEnd = new Phaser.Math.Vector2(pointer.x, pointer.y);
+      this.gameState = 'DRAGGING';
+
+      this.leftItems.forEach((i) => i.setScale(this.currentItemScale));
+      this.rightItems.forEach((i) => i.setScale(this.currentItemScale));
+      img.setScale(this.currentItemScale * 1.06);
+
+      if (!this.draggingLine) {
+        this.draggingLine = this.add.image(0, 0, CONNECT_LINE_KEY).setOrigin(0.5).setDepth(LINE_DEPTH).setAlpha(0.85);
+      }
+      this.draggingLine.setVisible(true).clearTint();
+      this.ensureLineCaps(this.draggingLine);
+      this.redrawConnections();
+    });
+
+    this.input.on('drag', (pointer: Phaser.Input.Pointer) => {
+      if (!this.draggingKey || this.gameState !== 'DRAGGING') return;
+      this.dragLineEnd = new Phaser.Math.Vector2(pointer.x, pointer.y);
+      this.redrawConnections();
+    });
+
+    this.input.on('dragend', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject) => {
+      const img = gameObject as Phaser.GameObjects.Image;
+      const matchKey = img.getData('matchKey') as MatchKey | undefined;
+      if (!matchKey || matchKey !== this.draggingKey) return;
+
+      this.leftItems.forEach((i) => i.setScale(this.currentItemScale));
+      this.rightItems.forEach((i) => i.setScale(this.currentItemScale));
+
+      const side = (img.getData('holeSide') as 'LEFT' | 'RIGHT' | undefined) ?? this.draggingSide ?? 'LEFT';
+      const target = side === 'LEFT' ? this.getRightItemAt(pointer.x, pointer.y) : this.getLeftItemAt(pointer.x, pointer.y);
+      if (!target) {
+        this.draggingKey = undefined;
+        this.draggingSide = undefined;
+        this.dragLineEnd = undefined;
+        this.draggingLine?.setVisible(false);
+        this.gameState = 'INTRO';
+        this.redrawConnections();
+        return;
+      }
+
+      const targetKey = target.getData('matchKey') as MatchKey;
+      if (side === 'LEFT') {
+        this.checkMatch(matchKey, targetKey);
+      } else {
+        this.checkMatch(targetKey, matchKey);
+      }
+    });
+  }
+
+  private getRightItemAt(x: number, y: number) {
+    for (const img of this.rightItems) {
+      const matchKey = img.getData('matchKey') as MatchKey;
+      if (this.matched.has(matchKey)) continue;
+      if (img.getBounds().contains(x, y)) return img;
+    }
+    return undefined;
+  }
+
+  private getLeftItemAt(x: number, y: number) {
+    for (const img of this.leftItems) {
+      const matchKey = img.getData('matchKey') as MatchKey;
+      if (this.matched.has(matchKey)) continue;
+      if (img.getBounds().contains(x, y)) return img;
+    }
+    return undefined;
+  }
+
+  /* ===================== LAYOUT ===================== */
+
+  private layoutScene() {
+    const { width, height } = this.scale;
+    const centerX = width / 2;
+
+    const bannerMaxW = width * BANNER_MAX_W_RATIO;
+    const bannerMaxH = Math.max(44, height * 0.12);
+    const bannerTex = this.textures.get(this.questionBanner.texture.key);
+    const bannerSrc = bannerTex?.getSourceImage() as { width: number; height: number } | undefined;
+    const bannerSrcW = bannerSrc?.width ?? this.questionBanner.width ?? 1;
+    const bannerSrcH = bannerSrc?.height ?? this.questionBanner.height ?? 1;
+    const bannerScaleX = Math.min(1.0, bannerMaxW / Math.max(1, bannerSrcW));
+    const bannerScaleY = Math.min(BANNER_SCALE, bannerMaxH / Math.max(1, bannerSrcH));
+
+    this.questionBanner.setScale(bannerScaleX, bannerScaleY);
+
+    const topPadding = Math.max(22, height * 0.04);
+    const bannerY = Math.max(BANNER_Y, topPadding + this.questionBanner.displayHeight / 2);
+    this.questionBanner.setPosition(centerX, bannerY);
+    this.promptText.setPosition(this.questionBanner.x, this.questionBanner.y);
+    this.promptImage?.setPosition(this.questionBanner.x, this.questionBanner.y);
+
+    const bottomEdge = height;
+    const feedbackY = bottomEdge - FEEDBACK_BOTTOM_MARGIN;
+    this.feedbackText.setPosition(centerX, feedbackY);
+
+    const itemsTop =
+      this.questionBanner.y +
+      this.questionBanner.displayHeight / 2 +
+      Math.max(ITEMS_GAP_FROM_BANNER, height * 0.04) +
+      ITEMS_SHIFT_FROM_BANNER;
+    const itemsBottom =
+      feedbackY - this.feedbackText.displayHeight / 2 - Math.max(ITEMS_GAP_FROM_FEEDBACK, height * 0.06);
+    const safeItemsBottom = Math.max(itemsTop + 1, itemsBottom);
+    const yPositions = this.getYPositions(LEFT_IDS.length, itemsTop, safeItemsBottom);
+
+    const span = Math.max(1, safeItemsBottom - itemsTop);
+    const gap = LEFT_IDS.length > 1 ? span / (LEFT_IDS.length - 1) : span;
+    const maxAllowedItemH = Math.max(46, gap * ITEM_FILL_RATIO);
+    const maxSrcH = Math.max(
+      1,
+      ...this.leftItems.map((i) => i.height ?? 0),
+      ...this.rightItems.map((i) => i.height ?? 0),
+    );
+    this.currentItemScale = Math.min(ITEM_SCALE, maxAllowedItemH / maxSrcH);
+    this.leftItems.forEach((i) => i.setScale(this.currentItemScale));
+    this.rightItems.forEach((i) => i.setScale(this.currentItemScale));
+
+    const columnGap = Math.min(COLUMN_GAP_MAX, Math.max(COLUMN_GAP_MIN, width * COLUMN_GAP_RATIO));
+    const leftX = centerX - columnGap / 2;
+    const rightX = centerX + columnGap / 2;
+
+    for (let i = 0; i < this.leftItems.length; i++) {
+      // HAND/FEET column on the right
+      this.leftItems[i].setPosition(rightX, yPositions[i] ?? 0);
+    }
+    for (let i = 0; i < this.rightItems.length; i++) {
+      // GLOVE/SHOE column on the left
+      this.rightItems[i].setPosition(leftX, yPositions[i] ?? 0);
+    }
+
+    let bounds: Phaser.Geom.Rectangle | undefined;
+    if (this.itemsBoard && this.itemsBoard.scene) {
+      const all = [...this.leftItems, ...this.rightItems];
+      const first = all[0];
+      if (first) {
+        bounds = first.getBounds();
+        for (let i = 1; i < all.length; i++) {
+          const b = all[i].getBounds();
+          Phaser.Geom.Rectangle.Union(bounds, b, bounds);
+        }
+        this.itemsBoard
+          .setPosition(bounds.centerX, bounds.centerY)
+          .setDisplaySize(bounds.width + ITEMS_BOARD_PAD_X * 2, bounds.height + ITEMS_BOARD_PAD_Y * 2);
+      }
+    }
+
+    if (this.itemsBoard && this.sideCharacter && bounds) {
+      const boardW = this.itemsBoard.displayWidth;
+      const boardH = this.itemsBoard.displayHeight;
+
+      const baseScale = (height / 720) * SIDE_CHAR_BASE_SCALE;
+      const maxCharH = Math.max(1, boardH * SIDE_CHAR_BOARD_MAX_H_RATIO);
+      const charScale = Math.min(baseScale, maxCharH / Math.max(1, this.sideCharacter.height));
+      this.sideCharacter.setScale(charScale);
+
+      const gap = Math.max(SIDE_CHAR_BOARD_GAP_MIN, width * SIDE_CHAR_BOARD_GAP_RATIO);
+      const groupW = this.sideCharacter.displayWidth + gap + boardW;
+      const groupLeft = centerX - groupW / 2;
+      const charX = groupLeft + this.sideCharacter.displayWidth / 2;
+      const boardX = groupLeft + this.sideCharacter.displayWidth + gap + boardW / 2;
+
+      const dx = boardX - bounds.centerX;
+      if (dx !== 0) {
+        this.leftItems.forEach((i) => i.setX(i.x + dx));
+        this.rightItems.forEach((i) => i.setX(i.x + dx));
+      }
+
+      const boardY = bounds.centerY;
+      this.itemsBoard.setPosition(boardX, boardY);
+
+      const charBottomY = Math.min(height - 10, boardY + this.itemsBoard.displayHeight / 2);
+      this.sideCharacter.setPosition(charX, charBottomY);
+
+      this.tweens.killTweensOf(this.sideCharacter);
+      this.tweens.add({
+        targets: this.sideCharacter,
+        y: this.sideCharacter.y - height * SIDE_CHAR_BOB_RATIO,
+        duration: 900,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.inOut',
+      });
+      this.sideCharacter.setAngle(0);
+    }
+
+    this.updateHintForRound();
+    this.redrawConnections();
+  }
+
+  private getYPositions(count: number, top: number, bottom: number) {
+    const safeTop = Math.min(top, bottom);
+    const safeBottom = Math.max(top, bottom);
+    const centerY = (safeTop + safeBottom) / 2;
+    if (count <= 1) return [Math.round(centerY)];
+
+    const gap = (safeBottom - safeTop) / (count - 1);
+    return Array.from({ length: count }, (_, i) => safeTop + gap * i);
+  }
+
+  /* ===================== START ROUND ===================== */
+
+  private startRound() {
+    this.updateHintForRound();
+    this.resetUiForNewTry();
+    this.ensureQuestionAudioUnlockedThenPlay();
+    this.playInstructionVoiceOnce();
+    this.gameState = 'INTRO';
+  }
+
+  private updateHintForRound() {
+    const fallback = 'Ghép tương ứng các đồ dùng về kích cỡ!';
+
+    if (this.promptImage && !(this.promptImage.scene as unknown as { sys?: unknown })?.sys) {
+      this.promptImage = undefined;
+    }
+
+    if (this.textures.exists(HINT_IMG_KEY)) {
+      this.promptText.setVisible(false);
+
+      if (!this.promptImage) {
+        this.promptImage = this.add
+          .image(this.questionBanner.x, this.questionBanner.y, HINT_IMG_KEY)
+          .setOrigin(0.5)
+          .setDepth(this.promptText.depth + 1);
+      } else {
+        this.promptImage.setTexture(HINT_IMG_KEY).setVisible(true);
+      }
+
+      const bannerW = Math.max(1, this.questionBanner.displayWidth);
+      const bannerH = Math.max(1, this.questionBanner.displayHeight);
+      const imgW = Math.max(1, this.promptImage.width);
+      const imgH = Math.max(1, this.promptImage.height);
+      const scale = Math.min((bannerW * 0.86) / imgW, (bannerH * 0.8) / imgH, PROMPT_IMG_SCALE);
+
+      this.promptImage.setPosition(this.questionBanner.x, this.questionBanner.y).setScale(scale);
+      return;
+    }
+
+    this.promptImage?.setVisible(false);
+    this.promptText.setVisible(true).setText(fallback);
+  }
+
+  /* ===================== RESET ===================== */
+
+  private resetUiForNewTry() {
+    this.feedbackText.setText('');
+    this.draggingKey = undefined;
+    this.draggingSide = undefined;
+    this.dragLineEnd = undefined;
+    this.draggingLine?.setVisible(false);
+    this.wrongLine?.setVisible(false);
+    this.wrongLineSeg = undefined;
+    this.leftItems.forEach((i) => i.setAlpha(1));
+    this.rightItems.forEach((i) => i.setAlpha(1));
+    this.redrawConnections();
+  }
+
+  /* ===================== MATCH ===================== */
+
+  private checkMatch(left: MatchKey, right: MatchKey) {
+    if (this.gameState === 'LEVEL_END') return;
+    this.gameState = 'CHECKING';
+
+    const leftImg = this.leftItems.find((i) => i.getData('matchKey') === left);
+    const rightImg = this.rightItems.find((i) => i.getData('matchKey') === right);
+
+    if (left === right) {
+      AudioManager.play('sfx_correct');
+      AudioManager.playCorrectAnswer();
+
+      this.matched.add(left);
+      this.score = this.matched.size;
+
+      leftImg?.disableInteractive().setAlpha(0.9);
+      rightImg?.disableInteractive().setAlpha(0.9);
+
+      this.draggingKey = undefined;
+      this.draggingSide = undefined;
+      this.dragLineEnd = undefined;
+      this.draggingLine?.setVisible(false);
+      this.wrongLine?.setVisible(false);
+
+      if (leftImg && rightImg) {
+        const line = this.add.image(0, 0, CONNECT_LINE_KEY).setOrigin(0.5).setDepth(LINE_DEPTH);
+        this.matchedLines.set(left, line);
+        this.ensureLineCaps(line);
+      }
+      this.redrawConnections();
+      this.animateCorrect(leftImg, rightImg, this.matchedLines.get(left));
+
+      if (this.matched.size >= LEFT_IDS.length) {
+        this.gameState = 'LEVEL_END';
+        this.time.delayedCall(1000, () => {
+          this.scene.start('EndGameScene', {
+            lessonId: '',
+            score: this.score,
+            total: LEFT_IDS.length,
+          });
+        });
+        return;
+      }
+
+      this.time.delayedCall(450, () => {
+        if (!this.scene.isActive()) return;
+        this.gameState = 'INTRO';
+      });
+      return;
+    }
+
+    AudioManager.play('sfx_wrong');
+
+    this.draggingLine?.setVisible(false);
+
+    if (!this.wrongLine) {
+      this.wrongLine = this.add.image(0, 0, CONNECT_LINE_KEY).setOrigin(0.5).setDepth(LINE_DEPTH);
+    }
+    this.wrongLine.setVisible(true).setTint(0xff4d4d).setAlpha(0.95);
+    this.ensureLineCaps(this.wrongLine);
+
+    const leftHole = leftImg ? this.getHoleWorldPoint(leftImg) : { x: 0, y: 0 };
+    const rightHole = rightImg ? this.getHoleWorldPoint(rightImg) : { x: 0, y: 0 };
+    const x1 = leftHole.x;
+    const y1 = leftHole.y;
+    const x2 = rightHole.x;
+    const y2 = rightHole.y;
+    this.wrongLineSeg = { x1, y1, x2, y2 };
+    this.updateLineSprite(this.wrongLine, x1, y1, x2, y2);
+
+    this.draggingKey = undefined;
+    this.draggingSide = undefined;
+    this.dragLineEnd = undefined;
+    this.redrawConnections();
+    this.animateWrong(leftImg, rightImg, this.wrongLine);
+
+    this.time.delayedCall(650, () => {
+      if (!this.scene.isActive()) return;
+      this.wrongLine?.setVisible(false);
+      this.wrongLineSeg = undefined;
+      this.gameState = 'INTRO';
+      this.redrawConnections();
+    });
+  }
+
+  private animateCorrect(
+    _leftImg?: Phaser.GameObjects.Image,
+    _rightImg?: Phaser.GameObjects.Image,
+    line?: Phaser.GameObjects.Image,
+  ) {
+    if (!line) return;
+    this.ensureLineCaps(line);
+
+    line.setTint(0x6bff8a).setAlpha(1);
+    this.tweens.add({
+      targets: [line, ...this.getLineCapsTargets(line)],
+      alpha: { from: 0.85, to: 1 },
+      duration: 90,
+      yoyo: true,
+      repeat: 3,
+      ease: 'Sine.inOut',
+      onComplete: () => line.clearTint(),
+    });
+  }
+
+  private animateWrong(_leftImg?: Phaser.GameObjects.Image, _rightImg?: Phaser.GameObjects.Image, line?: Phaser.GameObjects.Image) {
+    if (!line) return;
+    this.ensureLineCaps(line);
+
+    this.tweens.add({
+      targets: [line, ...this.getLineCapsTargets(line)],
+      alpha: { from: 0.25, to: 0.95 },
+      duration: 80,
+      yoyo: true,
+      repeat: 3,
+      ease: 'Sine.inOut',
+    });
+  }
+
+  private ensureLineCaps(line: Phaser.GameObjects.Image) {
+    if (this.lineCaps.has(line)) return;
+
+    const start = this.add.circle(0, 0, LINE_CAP_RADIUS, 0xffffff, 1).setOrigin(0.5).setDepth(line.depth).setVisible(false);
+    const end = this.add.circle(0, 0, LINE_CAP_RADIUS, 0xffffff, 1).setOrigin(0.5).setDepth(line.depth).setVisible(false);
+    this.lineCaps.set(line, { start, end });
+  }
+
+  private getLineCapsTargets(line: Phaser.GameObjects.Image) {
+    const caps = this.lineCaps.get(line);
+    if (!caps) return [];
+    return [caps.start, caps.end];
+  }
+
+  private destroyLineCaps(line: Phaser.GameObjects.Image) {
+    const caps = this.lineCaps.get(line);
+    if (!caps) return;
+    caps.start.destroy();
+    caps.end.destroy();
+    this.lineCaps.delete(line);
+  }
+
+  private redrawConnections() {
+    for (const matchKey of this.matched) {
+      const left = this.leftItems.find((i) => i.getData('matchKey') === matchKey);
+      const right = this.rightItems.find((i) => i.getData('matchKey') === matchKey);
+      const line = this.matchedLines.get(matchKey);
+      if (!left || !right || !line) continue;
+      const lh = this.getHoleWorldPoint(left);
+      const rh = this.getHoleWorldPoint(right);
+      this.updateLineSprite(line, lh.x, lh.y, rh.x, rh.y, LINE_END_EXTEND, LINE_END_EXTEND);
+      line.setVisible(true).clearTint().setAlpha(1);
+    }
+
+    if (this.draggingKey && this.dragLineEnd && this.draggingLine) {
+      const side = this.draggingSide ?? 'LEFT';
+      const startItem =
+        side === 'LEFT'
+          ? this.leftItems.find((i) => i.getData('matchKey') === this.draggingKey)
+          : this.rightItems.find((i) => i.getData('matchKey') === this.draggingKey);
+
+      if (startItem) {
+        const startHole = this.getHoleWorldPoint(startItem);
+        this.updateLineSprite(
+          this.draggingLine,
+          startHole.x,
+          startHole.y,
+          this.dragLineEnd.x,
+          this.dragLineEnd.y,
+          LINE_DRAG_START_EXTEND,
+          0,
+        );
+        this.draggingLine.setVisible(true).clearTint().setAlpha(0.85);
+      }
+    }
+
+    if (this.wrongLine?.visible && this.wrongLineSeg) {
+      this.updateLineSprite(
+        this.wrongLine,
+        this.wrongLineSeg.x1,
+        this.wrongLineSeg.y1,
+        this.wrongLineSeg.x2,
+        this.wrongLineSeg.y2,
+        LINE_END_EXTEND,
+        LINE_END_EXTEND,
+      );
+    }
+  }
+
+  private updateLineSprite(
+    line: Phaser.GameObjects.Image,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    extendStart = 0,
+    extendEnd = 0,
+  ) {
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    const baseDist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+    const ux = dx / baseDist;
+    const uy = dy / baseDist;
+
+    const maxExtend = Math.max(0, baseDist / 2 - 1);
+    const s = Math.min(Math.max(0, extendStart), maxExtend);
+    const e = Math.min(Math.max(0, extendEnd), maxExtend);
+
+    const ax1 = x1 - ux * s;
+    const ay1 = y1 - uy * s;
+    const ax2 = x2 + ux * e;
+    const ay2 = y2 + uy * e;
+
+    dx = ax2 - ax1;
+    dy = ay2 - ay1;
+    const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+    const angle = Math.atan2(dy, dx);
+
+    line.setPosition((ax1 + ax2) / 2, (ay1 + ay2) / 2);
+    line.setRotation(angle);
+    line.setDisplaySize(dist, LINE_THICKNESS);
+  }
+
+  private getHoleWorldPoint(img: Phaser.GameObjects.Image) {
+    const tex = this.textures.get(img.texture.key);
+    const src = tex?.getSourceImage() as { width: number; height: number } | undefined;
+
+    const srcW = src?.width ?? img.width ?? 1;
+    const srcH = src?.height ?? img.height ?? 1;
+
+    const side = img.getData('holeSide') as 'LEFT' | 'RIGHT' | undefined;
+    const holeBox = side === 'LEFT' ? HOLE_BOX_LEFT : HOLE_BOX_RIGHT;
+
+    const holeCenterX = holeBox.left + holeBox.width / 2;
+    const holeCenterY = holeBox.top + holeBox.height / 2;
+
+    const rx = holeCenterX / Math.max(1, srcW);
+    const ry = holeCenterY / Math.max(1, srcH);
+
+    const topLeftX = img.x - img.displayWidth / 2;
+    const topLeftY = img.y - img.displayHeight / 2;
+
+    return {
+      x: topLeftX + rx * img.displayWidth,
+      y: topLeftY + ry * img.displayHeight,
+    };
+  }
+}
