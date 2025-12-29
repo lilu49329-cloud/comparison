@@ -7,6 +7,42 @@ import { initRotateOrientation } from "./rotateOrientation";
 import PreloadScene from "./PreloadScene";
 import BalanceScene from "./BalanceScene";
 
+const AUDIO_UNLOCKED_KEY = "__audioUnlocked__";
+const AUDIO_UNLOCKED_EVENT = "audio-unlocked";
+
+function markAudioUnlocked() {
+  const win = window as unknown as Record<string, unknown>;
+  if (win[AUDIO_UNLOCKED_KEY]) return;
+  win[AUDIO_UNLOCKED_KEY] = true;
+  window.dispatchEvent(new Event(AUDIO_UNLOCKED_EVENT));
+}
+
+function unlockAudioFromUserGesture() {
+  try {
+    markAudioUnlocked();
+  } catch {}
+
+  try {
+    AudioManager.unlockAndWarmup?.();
+  } catch {}
+
+  try {
+    ensureBgmStarted();
+  } catch {}
+}
+
+function setupGlobalAudioUnlock() {
+  const win = window as unknown as Record<string, unknown>;
+  if (win[AUDIO_UNLOCKED_KEY]) return;
+
+  const handler = () => unlockAudioFromUserGesture();
+
+  // Capture để ăn cả click/tap trên overlay DOM (Vercel embed) trước khi Phaser nhận input.
+  (["pointerdown", "touchstart", "mousedown", "keydown"] as const).forEach((ev) => {
+    document.addEventListener(ev, handler, { once: true, capture: true } as AddEventListenerOptions);
+  });
+}
+
 
 // ================== TẠO CONTAINER GAME ==================
 const containerId = "game-container";
@@ -179,6 +215,9 @@ function setupHtmlButtons() {
     replayBtn.addEventListener("click", () => {
       if (!game) return;
 
+      // ✅ unlock audio ngay trên thao tác click DOM (đảm bảo voice/BGM không bị "đợi chơi lại")
+      unlockAudioFromUserGesture();
+
       // Dừng toàn bộ âm thanh trước khi chơi lại để tránh lồng nhau
       AudioManager.stopAll();
 
@@ -240,6 +279,8 @@ function waitForFredoka(): Promise<void> {
 }
 // ================== KHỞI TẠO GAME ==================
 async function initGame() {
+  setupGlobalAudioUnlock();
+
   try {
     await waitForFredoka();
   } catch (e) {

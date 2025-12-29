@@ -3,6 +3,7 @@ import AudioManager from './AudioManager';
 
 /* ===================== AUDIO GLOBAL FLAG ===================== */
 const AUDIO_UNLOCKED_KEY = '__audioUnlocked__';
+const AUDIO_UNLOCKED_EVENT = 'audio-unlocked';
 const SORT_LEVELS_KEY = '__sortHeightLevels__';
 
 /* ===================== TYPES ===================== */
@@ -212,6 +213,21 @@ export default class GameScene extends Phaser.Scene {
   private currentVoiceId?: string;
   private readonly VOICE_COOLDOWN_MS = 1200;
   private lastPointerDownAt = 0;
+  private readonly onAudioUnlocked = () => {
+    const win = window as unknown as Record<string, unknown>;
+    win[AUDIO_UNLOCKED_KEY] = true;
+    this.audioReady = true;
+
+    try {
+      AudioManager.unlockAndWarmup?.();
+    } catch {}
+
+    try {
+      if (!AudioManager.isPlaying('bgm_main')) AudioManager.play('bgm_main');
+    } catch {}
+
+    if (!this.levelVoicePlayed) this.playVoiceForLevel(true);
+  };
 
   constructor() {
     super('GameScene');
@@ -281,16 +297,16 @@ export default class GameScene extends Phaser.Scene {
     this.input.dragDistanceThreshold = DRAG_DISTANCE_THRESHOLD;
     this.input.dragTimeThreshold = DRAG_TIME_THRESHOLD;
 
+    // Nhận unlock từ DOM (click/tap overlay ngoài Phaser) -> phát voice ngay sau khi unlock.
+    window.addEventListener(AUDIO_UNLOCKED_EVENT, this.onAudioUnlocked, { once: true } as AddEventListenerOptions);
+
     // Unlock audio once
     this.input.once('pointerdown', () => {
-      const win = window as unknown as Record<string, unknown>;
-      const wasUnlocked = !!win[AUDIO_UNLOCKED_KEY];
       try {
-        if (!wasUnlocked) win[AUDIO_UNLOCKED_KEY] = true;
-        this.audioReady = true;
-        if (!AudioManager.isPlaying('bgm_main')) AudioManager.play('bgm_main');
-        // Chỉ force voice khi vừa unlock lần đầu
-        if (!wasUnlocked) this.playVoiceForLevel(true);
+        const win = window as unknown as Record<string, unknown>;
+        win[AUDIO_UNLOCKED_KEY] = true;
+        // Báo cho listener DOM -> dùng chung một luồng (để không bị khác hành vi giữa local/Vercel).
+        window.dispatchEvent(new Event(AUDIO_UNLOCKED_EVENT));
       } catch (e) {
         console.warn('[Audio] unlock/play failed', e);
       }
