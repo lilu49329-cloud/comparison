@@ -27,7 +27,8 @@ function unlockAudioFromUserGesture() {
   } catch {}
 
   try {
-    ensureBgmStarted();
+    // Nếu audio còn đang load, đảm bảo bgm sẽ chạy ngay khi ready.
+    AudioManager.playWhenReady?.("bgm_main");
   } catch {}
 }
 

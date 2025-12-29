@@ -52,6 +52,7 @@ class AudioManager {
   private sounds: Record<string, Howl> = {};
   private lastPlayTimes: Record<string, number> = {};
   private dynamicSources: Record<string, string> = {};
+  private pendingReadyPlays: Record<string, boolean> = {};
 
   private unlocked = false;
   private unlocking = false;
@@ -178,6 +179,40 @@ class AudioManager {
 
     this.lastPlayTimes[id] = now;
     return sound.play();
+  }
+
+  /**
+   * Phát 1 lần ngay khi sound "ready" (đã load xong). Dùng cho voice/BGM lúc user gesture xảy ra
+   * nhưng audio vẫn đang loading (tránh trường hợp: click lần đầu không nghe, phải bấm chơi lại).
+   */
+  playWhenReady(id: string): void {
+    if (this.unlocking) return;
+
+    const sound = this.sounds[id];
+    if (!sound) {
+      console.warn(`[AudioManager] Sound ID not found: ${id}`);
+      return;
+    }
+
+    const state = (sound as any).state?.() as 'unloaded' | 'loading' | 'loaded' | undefined;
+    if (!state || state === 'loaded') {
+      this.play(id);
+      return;
+    }
+
+    if (this.pendingReadyPlays[id]) return;
+    this.pendingReadyPlays[id] = true;
+
+    sound.off('load');
+    sound.once('load', () => {
+      this.pendingReadyPlays[id] = false;
+      this.play(id);
+    });
+    sound.once('loaderror', () => {
+      this.pendingReadyPlays[id] = false;
+    });
+
+    if (state === 'unloaded') sound.load();
   }
 
   isPlaying(id: string): boolean {

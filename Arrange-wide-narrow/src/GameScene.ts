@@ -223,7 +223,7 @@ export default class GameScene extends Phaser.Scene {
     } catch {}
 
     try {
-      if (!AudioManager.isPlaying('bgm_main')) AudioManager.play('bgm_main');
+      if (!AudioManager.isPlaying('bgm_main')) AudioManager.playWhenReady?.('bgm_main');
     } catch {}
 
     if (!this.levelVoicePlayed) this.playVoiceForLevel(true);
@@ -1162,7 +1162,7 @@ export default class GameScene extends Phaser.Scene {
     this.currentVoiceId = voiceId;
 
     if (this.audioReady) {
-      AudioManager.play(voiceId);
+      AudioManager.playWhenReady?.(voiceId);
     }
   }
 }
