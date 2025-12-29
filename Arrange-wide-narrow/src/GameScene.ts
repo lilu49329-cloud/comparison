@@ -214,19 +214,21 @@ export default class GameScene extends Phaser.Scene {
   private readonly VOICE_COOLDOWN_MS = 1200;
   private lastPointerDownAt = 0;
   private readonly onAudioUnlocked = () => {
-    const win = window as unknown as Record<string, unknown>;
-    win[AUDIO_UNLOCKED_KEY] = true;
-    this.audioReady = true;
+    (async () => {
+      const win = window as unknown as Record<string, unknown>;
+      win[AUDIO_UNLOCKED_KEY] = true;
+      this.audioReady = true;
 
-    try {
-      AudioManager.unlockAndWarmup?.();
-    } catch {}
+      try {
+        await AudioManager.unlockAndWarmup?.();
+      } catch {}
 
-    try {
-      if (!AudioManager.isPlaying('bgm_main')) AudioManager.playWhenReady?.('bgm_main');
-    } catch {}
+      try {
+        if (!AudioManager.isPlaying('bgm_main')) AudioManager.playWhenReady?.('bgm_main');
+      } catch {}
 
-    if (!this.levelVoicePlayed) this.playVoiceForLevel(true);
+      if (!this.levelVoicePlayed) this.playVoiceForLevel(true);
+    })();
   };
 
   constructor() {

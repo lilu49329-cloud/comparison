@@ -22,14 +22,16 @@ function unlockAudioFromUserGesture() {
     markAudioUnlocked();
   } catch {}
 
-  try {
-    AudioManager.unlockAndWarmup?.();
-  } catch {}
+  (async () => {
+    try {
+      await AudioManager.unlockAndWarmup?.();
+    } catch {}
 
-  try {
-    // Nếu audio còn đang load, đảm bảo bgm sẽ chạy ngay khi ready.
-    AudioManager.playWhenReady?.("bgm_main");
-  } catch {}
+    try {
+      // Nếu audio còn đang load, đảm bảo bgm sẽ chạy ngay khi ready.
+      AudioManager.playWhenReady?.("bgm_main");
+    } catch {}
+  })();
 }
 
 function setupGlobalAudioUnlock() {
