@@ -1,6 +1,10 @@
 import Phaser from 'phaser';
 import AudioManager from './AudioManager';
 
+/* ===================== AUDIO GLOBAL FLAG ===================== */
+const AUDIO_UNLOCKED_KEY = '__audioUnlocked__';
+const AUDIO_UNLOCKED_EVENT = 'audio-unlocked';
+
 /* ===================== TYPES ===================== */
 
 type GameState = 'INTRO' | 'DRAGGING' | 'CHECKING' | 'LEVEL_END';
@@ -99,7 +103,6 @@ export default class GameScene extends Phaser.Scene {
   public score = 0;
 
   private gameState: GameState = 'INTRO';
-  private hasQueuedQuestionVoiceUnlock = false;
   private hasPlayedInstructionVoice = false;
   private currentItemScale = ITEM_SCALE;
 
@@ -127,6 +130,21 @@ export default class GameScene extends Phaser.Scene {
   private draggingLine?: Phaser.GameObjects.Image;
   private wrongLine?: Phaser.GameObjects.Image;
   private wrongLineSeg?: { x1: number; y1: number; x2: number; y2: number };
+  private audioReady = false;
+  private readonly onAudioUnlocked = () => {
+    (async () => {
+      const win = window as unknown as Record<string, unknown>;
+      win[AUDIO_UNLOCKED_KEY] = true;
+      this.audioReady = true;
+
+      try {
+        await AudioManager.unlockAndWarmup?.();
+      } catch {}
+
+      // Khi vừa unlock lần đầu, phát voice hướng dẫn ngay (nếu chưa phát).
+      this.playInstructionVoiceOnce();
+    })();
+  };
 
   constructor() {
     super('GameScene');
@@ -137,7 +155,6 @@ export default class GameScene extends Phaser.Scene {
   init(data: { score?: number }) {
     this.score = data.score ?? 0;
     this.promptImage = undefined;
-    this.hasQueuedQuestionVoiceUnlock = false;
     this.hasPlayedInstructionVoice = false;
     this.matched.clear();
     this.draggingKey = undefined;
@@ -145,6 +162,9 @@ export default class GameScene extends Phaser.Scene {
     this.wrongLine = undefined;
     this.wrongLineSeg = undefined;
     this.gameState = 'INTRO';
+
+    const win = window as unknown as Record<string, unknown>;
+    this.audioReady = !!win[AUDIO_UNLOCKED_KEY];
   }
 
   /* ===================== CREATE ===================== */
@@ -176,6 +196,9 @@ export default class GameScene extends Phaser.Scene {
     setBtnBgFromUrl(nextBtnEl, 'assets/button/next.png');
 
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
+
+    // Nhận unlock từ DOM (click/tap overlay ngoài Phaser) -> phát voice ngay sau khi unlock.
+    window.addEventListener(AUDIO_UNLOCKED_EVENT, this.onAudioUnlocked, { once: true } as AddEventListenerOptions);
 
     this.questionBanner = this.add
       .image(width / 2, BANNER_Y, 'btn_primary_pressed')
@@ -227,46 +250,21 @@ export default class GameScene extends Phaser.Scene {
 
   /* ===================== AUDIO ===================== */
 
-  private ensureQuestionAudioUnlockedThenPlay() {
-    const audioUnlockedKey = '__questionAudioUnlocked__';
-    const w = window as unknown as WindowGameApi;
-    const audioUnlocked = Boolean(w[audioUnlockedKey]);
-
-    if (audioUnlocked) return;
-    if (this.hasQueuedQuestionVoiceUnlock) return;
-    this.hasQueuedQuestionVoiceUnlock = true;
-
-    this.input.once('pointerdown', () => {
-      w[audioUnlockedKey] = true;
-      this.hasQueuedQuestionVoiceUnlock = false;
-    });
-  }
-
   private playInstructionVoiceOnce() {
     if (this.hasPlayedInstructionVoice) return;
 
-    const audioUnlockedKey = '__questionAudioUnlocked__';
-    const w = window as unknown as WindowGameApi;
-    const audioUnlocked = Boolean(w[audioUnlockedKey]);
-
     const play = () => {
       if (this.hasPlayedInstructionVoice) return;
-      AudioManager.play('voice_join');
+      AudioManager.playWhenReady?.('voice_join');
       this.hasPlayedInstructionVoice = true;
       // Nếu bé click/drag nhanh sau khi voice chạy thì cắt voice để tránh gây khó chịu.
       this.input.once('pointerdown', () => AudioManager.stop('voice_join'));
     };
 
-    if (audioUnlocked) {
+    if (this.audioReady) {
       play();
       return;
     }
-
-    this.ensureQuestionAudioUnlockedThenPlay();
-    this.input.once('pointerdown', () => {
-      w[audioUnlockedKey] = true;
-      play();
-    });
   }
 
   /* ===================== BUILD ITEMS ===================== */
@@ -537,7 +535,6 @@ export default class GameScene extends Phaser.Scene {
   private startRound() {
     this.updateHintForRound();
     this.resetUiForNewTry();
-    this.ensureQuestionAudioUnlockedThenPlay();
     this.playInstructionVoiceOnce();
     this.gameState = 'INTRO';
   }

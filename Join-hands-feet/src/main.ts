@@ -6,6 +6,42 @@ import AudioManager from "./AudioManager";
 import { initRotateOrientation } from "./rotateOrientation";
 import PreloadScene from "./PreloadScene";
 
+const AUDIO_UNLOCKED_KEY = "__audioUnlocked__";
+const AUDIO_UNLOCKED_EVENT = "audio-unlocked";
+
+function markAudioUnlocked() {
+  const win = window as unknown as Record<string, unknown>;
+  if (win[AUDIO_UNLOCKED_KEY]) return;
+  win[AUDIO_UNLOCKED_KEY] = true;
+  window.dispatchEvent(new Event(AUDIO_UNLOCKED_EVENT));
+}
+
+function unlockAudioFromUserGesture() {
+  try {
+    markAudioUnlocked();
+  } catch {}
+
+  (async () => {
+    try {
+      await AudioManager.unlockAndWarmup?.();
+    } catch {}
+
+    try {
+      AudioManager.playWhenReady?.("bgm_main");
+    } catch {}
+  })();
+}
+
+function setupGlobalAudioUnlock() {
+  const win = window as unknown as Record<string, unknown>;
+  if (win[AUDIO_UNLOCKED_KEY]) return;
+
+  const handler = () => unlockAudioFromUserGesture();
+  (["pointerdown", "touchstart", "mousedown", "keydown"] as const).forEach((ev) => {
+    document.addEventListener(ev, handler, { once: true, capture: true } as AddEventListenerOptions);
+  });
+}
+
 
 // ================== TẠO CONTAINER GAME ==================
 const containerId = "game-container";
@@ -113,9 +149,7 @@ let game: Phaser.Game | null = null;
 export function ensureBgmStarted() {
   console.log("[BGM] ensure play bgm_main");
   // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
-  if (!AudioManager.isPlaying("bgm_main")) {
-    AudioManager.play("bgm_main");
-  }
+  if (!AudioManager.isPlaying("bgm_main")) AudioManager.playWhenReady?.("bgm_main");
 }
 
 
@@ -173,6 +207,9 @@ function setupHtmlButtons() {
     replayBtn.addEventListener("click", () => {
       if (!game) return;
 
+      // Unlock audio ngay trên thao tác click DOM.
+      unlockAudioFromUserGesture();
+
       // Dừng toàn bộ âm thanh trước khi chơi lại để tránh lồng nhau
       AudioManager.stopAll();
 
@@ -222,6 +259,8 @@ function waitForFredoka(): Promise<void> {
 }
 // ================== KHỞI TẠO GAME ==================
 async function initGame() {
+  setupGlobalAudioUnlock();
+
   try {
     await waitForFredoka();
   } catch (e) {
