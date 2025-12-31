@@ -211,6 +211,13 @@ export default class GameScene extends Phaser.Scene {
 
     // Nhận unlock từ DOM (click/tap overlay ngoài Phaser) -> phát voice ngay sau khi unlock.
     window.addEventListener(AUDIO_UNLOCKED_EVENT, this.onAudioUnlocked, { once: true } as AddEventListenerOptions);
+    // Allow rotateOrientation to trigger the instruction voice after overlay is dismissed.
+    (window as any).playInstructionVoice = () => this.playInstructionVoiceOnce();
+    this.events.once('shutdown', () => {
+      try {
+        if ((window as any).playInstructionVoice) delete (window as any).playInstructionVoice;
+      } catch {}
+    });
 
     this.questionBanner = this.add
       .image(width / 2, BANNER_Y, 'btn_primary_pressed')
@@ -264,6 +271,8 @@ export default class GameScene extends Phaser.Scene {
 
   private playInstructionVoiceOnce() {
     if (this.hasPlayedInstructionVoice) return;
+    // When rotate overlay is active (portrait), only allow voice_rotate to play.
+    if ((window as any).__rotateOverlayActive__) return;
 
     const play = () => {
       if (this.hasPlayedInstructionVoice) return;

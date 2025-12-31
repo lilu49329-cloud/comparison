@@ -90,6 +90,11 @@ export function playVoiceLocked(
         }
         lastRotateVoiceTime = now;
 
+        if (currentVoiceKey) {
+            audioManager.stop(currentVoiceKey);
+        }
+        // Prevent overlapping with per-game instruction voice (e.g. Join-hands-feet voice_join).
+        audioManager.stop('voice_join');
         currentVoiceKey = null;
 
         const id = audioManager.play('voice_rotate');
@@ -231,6 +236,9 @@ function updateRotateHint() {
     const h = window.innerHeight;
     const shouldShow = h > w && w < rotateConfig.breakpoint; // portrait & nhỏ (mobile)
 
+    // Expose for scenes to avoid playing other voices while rotate overlay is active.
+    (window as any).__rotateOverlayActive__ = shouldShow;
+
     const overlayWasActive = isRotateOverlayActive;
     isRotateOverlayActive = shouldShow;
 
@@ -277,6 +285,15 @@ function updateRotateHint() {
                 e
             );
         }
+
+        // If the game exposes an instruction voice, play it once after rotate overlay is dismissed.
+        try {
+            const playInstruction =
+                (window as any).playInstructionVoice as (() => void) | undefined;
+            if (typeof playInstruction === 'function') {
+                playInstruction();
+            }
+        } catch {}
 
         // // Khi xoay ngang lại: bật lại BGM và intro (intro chỉ đọc 1 lần)
         // try {
