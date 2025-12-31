@@ -141,6 +141,17 @@ export default class GameScene extends Phaser.Scene {
   private guideHandTween?: Phaser.Tweens.Tween;
   private guideHandMatchKey?: MatchKey;
   private guideHandShownOnce = false;
+  private consumePendingInstructionVoice() {
+    try {
+      const win = window as any;
+      if (win.__rotateOverlayActive__) return;
+      if (!win.__pendingInstructionVoice__) return;
+      const force = !!win.__pendingInstructionVoiceForce__;
+      win.__pendingInstructionVoice__ = false;
+      win.__pendingInstructionVoiceForce__ = false;
+      this.playInstructionVoice(force);
+    } catch {}
+  }
   private readonly onAudioUnlocked = () => {
     (async () => {
       const win = window as unknown as Record<string, unknown>;
@@ -152,7 +163,8 @@ export default class GameScene extends Phaser.Scene {
       } catch {}
 
       // Khi vừa unlock lần đầu, phát voice hướng dẫn ngay (nếu chưa phát).
-      this.playInstructionVoiceOnce();
+      this.consumePendingInstructionVoice();
+      this.playInstructionVoice();
     })();
   };
 
@@ -212,7 +224,8 @@ export default class GameScene extends Phaser.Scene {
     // Nhận unlock từ DOM (click/tap overlay ngoài Phaser) -> phát voice ngay sau khi unlock.
     window.addEventListener(AUDIO_UNLOCKED_EVENT, this.onAudioUnlocked, { once: true } as AddEventListenerOptions);
     // Allow rotateOrientation to trigger the instruction voice after overlay is dismissed.
-    (window as any).playInstructionVoice = () => this.playInstructionVoiceOnce();
+    (window as any).playInstructionVoice = (force?: boolean) => this.playInstructionVoice(!!force);
+    this.consumePendingInstructionVoice();
     this.events.once('shutdown', () => {
       try {
         if ((window as any).playInstructionVoice) delete (window as any).playInstructionVoice;
@@ -269,13 +282,14 @@ export default class GameScene extends Phaser.Scene {
 
   /* ===================== AUDIO ===================== */
 
-  private playInstructionVoiceOnce() {
-    if (this.hasPlayedInstructionVoice) return;
+  private playInstructionVoice(force = false) {
+    if (!force && this.hasPlayedInstructionVoice) return;
     // When rotate overlay is active (portrait), only allow voice_rotate to play.
     if ((window as any).__rotateOverlayActive__) return;
 
     const play = () => {
-      if (this.hasPlayedInstructionVoice) return;
+      if (!force && this.hasPlayedInstructionVoice) return;
+      if (force) AudioManager.stop('voice_join');
       AudioManager.playWhenReady?.('voice_join');
       this.hasPlayedInstructionVoice = true;
       // Nếu bé click/drag nhanh sau khi voice chạy thì cắt voice để tránh gây khó chịu.
@@ -286,6 +300,13 @@ export default class GameScene extends Phaser.Scene {
       play();
       return;
     }
+
+    // Audio chưa unlock (thường do rotate-off không phải gesture) -> buffer để phát sau khi unlock.
+    try {
+      const win = window as any;
+      win.__pendingInstructionVoice__ = true;
+      win.__pendingInstructionVoiceForce__ = !!(win.__pendingInstructionVoiceForce__ || force);
+    } catch {}
   }
 
   /* ===================== BUILD ITEMS ===================== */
@@ -627,7 +648,7 @@ export default class GameScene extends Phaser.Scene {
   private startRound() {
     this.updateHintForRound();
     this.resetUiForNewTry();
-    this.playInstructionVoiceOnce();
+    this.playInstructionVoice();
     this.gameState = 'INTRO';
     this.scheduleGuideHand();
   }

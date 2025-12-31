@@ -207,6 +207,17 @@ class AudioManager {
     return !!sound && sound.playing();
   }
 
+  onceEnded(id: string, cb: () => void): void {
+    const sound = this.sounds[id];
+    if (!sound) {
+      cb();
+      return;
+    }
+
+    // Howler will call the handler when the current playback ends.
+    sound.once('end', () => cb());
+  }
+
   playFromUrl(id: string, src: string, opts?: { loop?: boolean; volume?: number; html5?: boolean }): number | undefined {
     if (this.unlocking) return;
 

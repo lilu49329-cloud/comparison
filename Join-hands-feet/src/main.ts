@@ -148,8 +148,28 @@ export function ensureBgmStarted() {
     } catch {}
 
     try {
-      // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
-      if (!AudioManager.isPlaying("bgm_main")) AudioManager.playWhenReady?.("bgm_main");
+      const startBgm = () => {
+        // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
+        if (!AudioManager.isPlaying("bgm_main")) AudioManager.playWhenReady?.("bgm_main");
+      };
+
+      // On some mobile browsers (notably iOS), starting BGM on the first gesture can cut
+      // an in-progress HTML5 voice prompt. When the rotate overlay is active, let the
+      // rotate instruction voice finish first, then start BGM.
+      if ((window as any).__rotateOverlayActive__ && AudioManager.isPlaying("voice_rotate")) {
+        let started = false;
+        const safeStart = () => {
+          if (started) return;
+          started = true;
+          startBgm();
+        };
+
+        AudioManager.onceEnded?.("voice_rotate", safeStart);
+        // Fallback in case 'end' doesn't fire (e.g. voice was interrupted).
+        setTimeout(safeStart, 4000);
+      } else {
+        startBgm();
+      }
     } catch {}
   })();
 }

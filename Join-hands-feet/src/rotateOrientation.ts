@@ -7,6 +7,9 @@ let rotateOverlay: HTMLDivElement | null = null;
 let isRotateOverlayActive = false;
 let currentVoiceKey: string | null = null;
 
+const AUDIO_UNLOCKED_KEY = '__audioUnlocked__';
+const AUDIO_UNLOCKED_EVENT = 'audio-unlocked';
+
 // chỉ attach 1 lần
 let globalBlockListenersAttached = false;
 
@@ -81,6 +84,11 @@ export function playVoiceLocked(
     // - Tắt hết âm thanh khác của game
     // - Có cooldown để tránh spam liên tục
     if (key === 'voice_rotate') {
+        // If rotate voice is already playing, don't restart it (prevents "cut in the middle").
+        if (currentVoiceKey === 'voice_rotate' && audioManager.isPlaying('voice_rotate')) {
+            return;
+        }
+
         const now = Date.now();
         if (now - lastRotateVoiceTime < ROTATE_VOICE_COOLDOWN) {
             // console.warn(
@@ -90,12 +98,11 @@ export function playVoiceLocked(
         }
         lastRotateVoiceTime = now;
 
-        if (currentVoiceKey) {
-            audioManager.stop(currentVoiceKey);
-        }
-        // Prevent overlapping with per-game instruction voice (e.g. Join-hands-feet voice_join).
-        audioManager.stop('voice_join');
         currentVoiceKey = null;
+
+        // Ensure rotate voice doesn't overlap with current guide voices.
+        audioManager.stop('voice_sort_road');
+        audioManager.stop('voice_sort_bridge');
 
         const id = audioManager.play('voice_rotate');
         if (id === undefined) {
@@ -236,11 +243,13 @@ function updateRotateHint() {
     const h = window.innerHeight;
     const shouldShow = h > w && w < rotateConfig.breakpoint; // portrait & nhỏ (mobile)
 
-    // Expose for scenes to avoid playing other voices while rotate overlay is active.
-    (window as any).__rotateOverlayActive__ = shouldShow;
-
     const overlayWasActive = isRotateOverlayActive;
     isRotateOverlayActive = shouldShow;
+
+    // Expose state globally so game scenes can avoid playing guide voices while rotate overlay is active.
+    try {
+        (window as any).__rotateOverlayActive__ = isRotateOverlayActive;
+    } catch {}
 
     const overlayTurnedOn = !overlayWasActive && shouldShow;
     const overlayTurnedOff = overlayWasActive && !shouldShow;
@@ -252,8 +261,29 @@ function updateRotateHint() {
         try {
             // Khi đang ở màn dọc: chỉ phát voice_rotate, tạm dừng nhạc/intro nếu có
             audioManager.stop('voice_intro');
+            audioManager.stop('voice_sort_road');
+            audioManager.stop('voice_sort_bridge');
+            // Nếu đang phát voice hướng dẫn của game (Join-hands-feet), thì cắt luôn khi chuyển sang màn dọc.
+            audioManager.stop('voice_join');
+            // Nếu đang có voice khác đang "lock" thì cũng cắt để tránh chồng với voice_rotate.
+            if (currentVoiceKey && currentVoiceKey !== 'voice_rotate') {
+                audioManager.stop(currentVoiceKey);
+                currentVoiceKey = null;
+            }
 
-            playVoiceLocked(null as any, 'voice_rotate');
+            // Browser policy: only autoplay after user gesture unlock.
+            // If already unlocked, we can play immediately; otherwise wait for unlock event / first tap.
+            const win = window as any;
+            const unlocked = !!win?.[AUDIO_UNLOCKED_KEY];
+            if (unlocked) {
+                playVoiceLocked(null as any, 'voice_rotate');
+            } else {
+                const onUnlocked = () => {
+                    if (!isRotateOverlayActive) return;
+                    playVoiceLocked(null as any, 'voice_rotate');
+                };
+                window.addEventListener(AUDIO_UNLOCKED_EVENT, onUnlocked, { once: true } as AddEventListenerOptions);
+            }
         } catch (e) {
             console.warn('[Rotate] auto play voice_rotate on overlay error:', e);
         }
@@ -286,12 +316,17 @@ function updateRotateHint() {
             );
         }
 
-        // If the game exposes an instruction voice, play it once after rotate overlay is dismissed.
+        // Nếu game có voice hướng dẫn (instruction) thì phát lại sau khi overlay tắt.
+        // Buffer lại để tránh trường hợp rotate-off xảy ra trước khi GameScene đăng ký handler.
         try {
+            (window as any).__pendingInstructionVoice__ = true;
+            (window as any).__pendingInstructionVoiceForce__ = true;
             const playInstruction =
-                (window as any).playInstructionVoice as (() => void) | undefined;
+                (window as any).playInstructionVoice as
+                    | ((force?: boolean) => void)
+                    | undefined;
             if (typeof playInstruction === 'function') {
-                playInstruction();
+                playInstruction(true);
             }
         } catch {}
 
