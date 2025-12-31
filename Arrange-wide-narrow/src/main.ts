@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 //import OverlayScene from "./OverlayScene";
-import GameScene from "./GameScene";
+import GameScene, { MAIN_LEVEL_COUNT } from "./GameScene";
 import EndGameScene from "./EndGameScene";
 import AudioManager from "./AudioManager";
 import { initRotateOrientation } from "./rotateOrientation";
@@ -18,20 +18,7 @@ function markAudioUnlocked() {
 }
 
 function unlockAudioFromUserGesture() {
-  try {
-    markAudioUnlocked();
-  } catch {}
-
-  (async () => {
-    try {
-      await AudioManager.unlockAndWarmup?.();
-    } catch {}
-
-    try {
-      // Nếu audio còn đang load, đảm bảo bgm sẽ chạy ngay khi ready.
-      AudioManager.playWhenReady?.("bgm_main");
-    } catch {}
-  })();
+  ensureBgmStarted();
 }
 
 function setupGlobalAudioUnlock() {
@@ -157,10 +144,22 @@ let game: Phaser.Game | null = null;
 
 export function ensureBgmStarted() {
   console.log("[BGM] ensure play bgm_main");
-  // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
-  if (!AudioManager.isPlaying("bgm_main")) {
-    AudioManager.play("bgm_main");
-  }
+  // ensureBgmStarted() is only called from a user gesture (overlay / button / first click),
+  // so it's safe to mark audio as unlocked here even when rotate overlay blocks propagation.
+  try {
+    markAudioUnlocked();
+  } catch {}
+
+  (async () => {
+    try {
+      await AudioManager.unlockAndWarmup?.();
+    } catch {}
+
+    try {
+      // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
+      if (!AudioManager.isPlaying("bgm_main")) AudioManager.playWhenReady?.("bgm_main");
+    } catch {}
+  })();
 }
 
 
@@ -224,24 +223,63 @@ function setupHtmlButtons() {
       // Dừng toàn bộ âm thanh trước khi chơi lại để tránh lồng nhau
       AudioManager.stopAll();
 
-      // Nếu đang ở màn phụ (BalanceScene/RemoveScene) → dừng màn phụ và quay lại GameScene của level hiện tại
+      const gameScene = game.scene.getScene("GameScene") as GameScene | null;
+      const levelCount = Math.max(1, MAIN_LEVEL_COUNT);
+      const currentMainTheme = (gameScene?.levels?.[gameScene.levelIndex] as any)?.theme as string | undefined;
+
+      const pickNextLevelIndex = (currentIndex: number, count: number) => {
+        if (count <= 1) return 0;
+        const normalized = Math.max(0, Math.min(currentIndex, count - 1));
+        let next = normalized;
+        for (let tries = 0; tries < 10 && next === normalized; tries++) {
+          next = Math.floor(Math.random() * count);
+        }
+        if (next === normalized) next = (normalized + 1) % count;
+        return next;
+      };
+
+      // Nếu đang ở màn phụ → dừng màn phụ và quay lại GameScene (random, không trùng màn trước)
       const balance = game.scene.getScene("BalanceScene") as BalanceScene | null;
       if (balance && balance.scene.isActive()) {
-        const levelIndex = balance.levelIndex ?? 0;
         const score = balance.score ?? 0;
+        const nextLevelIndex = pickNextLevelIndex(balance.levelIndex ?? 0, levelCount);
 
         game.scene.stop("BalanceScene");
-        game.scene.start("GameScene", { levelIndex, score });
+        game.scene.start("GameScene", {
+          levelIndex: nextLevelIndex,
+          score,
+          regenLevels: true,
+          avoidTheme: currentMainTheme,
+        } as any);
         ensureBgmStarted();
         return;
       }
-      // Ngược lại, đang ở GameScene → restart lại level hiện tại
+
+      // Nếu đang ở EndGame → chơi lại random
+      const end = game.scene.getScene("EndGameScene") as EndGameScene | null;
+      if (end && end.scene.isActive()) {
+        const nextLevelIndex = pickNextLevelIndex(0, levelCount);
+        game.scene.stop("EndGameScene");
+        game.scene.start("GameScene", {
+          levelIndex: nextLevelIndex,
+          score: 0,
+          regenLevels: true,
+          avoidTheme: currentMainTheme,
+        } as any);
+        ensureBgmStarted();
+        return;
+      }
+
+      // Ngược lại, đang ở GameScene → chuyển sang level random (không trùng level/theme trước)
       const scene = game.scene.getScene("GameScene") as GameScene | null;
       if (!scene) return;
-      scene.scene.restart({
-        levelIndex: scene.levelIndex,
+      const nextLevelIndex = pickNextLevelIndex(scene.levelIndex, levelCount);
+      game.scene.start("GameScene", {
+        levelIndex: nextLevelIndex,
         score: scene.score,
-      });
+        regenLevels: true,
+        avoidTheme: currentMainTheme,
+      } as any);
       ensureBgmStarted();
     });
   }

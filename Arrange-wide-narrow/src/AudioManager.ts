@@ -11,9 +11,9 @@ const BASE_PATH = 'assets/audio/';
 
 const SOUND_MAP: Record<string, SoundConfig> = {
   // ---- SFX Chung ----
-  sfx_correct: { src: `${BASE_PATH}correct.mp3`, volume: 0.7 },
-  sfx_wrong: { src: `${BASE_PATH}wrong.mp3`, volume: 0.7 },
-  sfx_click: { src: `${BASE_PATH}click.mp3`, volume: 0.7 },
+  sfx_correct: { src: `${BASE_PATH}correct.mp3`, volume: 0.6 },
+  sfx_wrong: { src: `${BASE_PATH}wrong.mp3`, volume: 0.6 },
+  sfx_click: { src: `${BASE_PATH}click.mp3`, volume: 0.6 },
   voice_rotate: { src: `${BASE_PATH}xoay.mp3`, volume: 0.8 },
 
   // ---- Correct Answers Voice Prompts ----
@@ -27,7 +27,7 @@ const SOUND_MAP: Record<string, SoundConfig> = {
   complete: { src: `${BASE_PATH}vic_sound.mp3` },
   voice_intro: { src: `${BASE_PATH}voice_intro.mp3` },
   voice_need_finish: { src: `${BASE_PATH}voice_need_finish.mp3` },
-  voice_complete: { src: `${BASE_PATH}complete.mp3`, volume: 0.5 },
+  voice_complete: { src: `${BASE_PATH}complete.mp3`, volume: 0.35 },
   voice_end: { src: `${BASE_PATH}voice_end.mp3`, volume: 0.8 },
   fireworks: { src: `${BASE_PATH}fireworks.mp3`, volume: 1.0 },
   applause: { src: `${BASE_PATH}applause.mp3`, volume: 1.0 },
@@ -35,6 +35,7 @@ const SOUND_MAP: Record<string, SoundConfig> = {
 
   // ==== Arrange-wide-narrow / BalanceScene ====
   add_birdcage: { src: `${BASE_PATH}add.mp3`, volume: 1.0 },
+  add_birdcage_door: { src: `${BASE_PATH}add2.mp3`, volume: 1.0 },
 
   // legacy/short keys (nếu code cũ còn gọi)
   voice_sort_road: { src: `${BASE_PATH}sr.mp3`, volume: 1.0 },

@@ -90,6 +90,8 @@ const SORT_THEMES = [
   { id: 'BRIDGE', label: 'Cây cầu', tint: 0x8e24aa },
 ] as const satisfies ReadonlyArray<{ id: SortThemeId; label: string; tint: number }>;
 
+export const MAIN_LEVEL_COUNT = SORT_THEMES.length;
+
 const SORT_THEME_BY_ID = SORT_THEMES.reduce<Record<SortThemeId, (typeof SORT_THEMES)[number]>>((acc, theme) => {
   acc[theme.id] = theme;
   return acc;
@@ -236,8 +238,9 @@ export default class GameScene extends Phaser.Scene {
   }
 
   /* ===================== INIT ===================== */
-  init(data: { levelIndex?: number; score?: number }) {
-    this.levelIndex = data.levelIndex ?? 0;
+  init(data: { levelIndex?: number; score?: number; regenLevels?: boolean; avoidTheme?: SortThemeId }) {
+    const requestedLevelIndex = data.levelIndex ?? 0;
+    this.levelIndex = requestedLevelIndex;
     this.level = this.levelIndex;
     this.score = data.score ?? 0;
 
@@ -261,26 +264,46 @@ export default class GameScene extends Phaser.Scene {
     const win = window as unknown as Record<string, unknown>;
     this.audioReady = !!win[AUDIO_UNLOCKED_KEY];
 
-    // Màn sắp xếp hiện tại: chỉ có 2 level chính.
-    const totalLevels = 2;
+    // Màn sắp xếp hiện tại: mỗi theme = 1 level chính.
+    const totalLevels = MAIN_LEVEL_COUNT;
     const savedState = win[SORT_LEVELS_KEY] as { levels?: SortLevelConfig[] } | undefined;
     const hasValidSavedLevels =
       savedState?.levels?.length === totalLevels &&
       savedState.levels.every((lvl) => typeof (lvl as any).theme === 'string' && Array.isArray((lvl as any).itemIds));
 
-    if (this.levelIndex === 0 || !hasValidSavedLevels) {
+    const shouldRegenerateLevels = data.regenLevels === true || this.levelIndex === 0 || !hasValidSavedLevels;
+    if (shouldRegenerateLevels) {
       const levels = this.generateLevels(totalLevels);
       this.levels = levels;
       win[SORT_LEVELS_KEY] = { levels };
     } else {
       this.levels = savedState!.levels!;
     }
+
+    // Clamp levelIndex into valid range.
+    if (this.levels.length > 0) {
+      this.levelIndex = Math.max(0, Math.min(this.levelIndex, this.levels.length - 1));
+    } else {
+      this.levelIndex = 0;
+    }
+
+    // If caller wants "random but not same theme as before", bump to another level if needed.
+    if (data.avoidTheme && this.levels.length > 1) {
+      const currentTheme = this.levels[this.levelIndex]?.theme;
+      if (currentTheme === data.avoidTheme) {
+        const altIndex = this.levels.findIndex((lvl) => lvl.theme !== data.avoidTheme);
+        if (altIndex >= 0) this.levelIndex = altIndex;
+      }
+    }
+
+    this.level = this.levelIndex;
   }
 
   /* ===================== LEVEL GENERATION ===================== */
   private generateLevels(numLevels: number): SortLevelConfig[] {
     const direction: SortDirection = 'ASC';
-    const themes = Phaser.Utils.Array.Shuffle(SORT_THEMES.map((x) => x.id));
+    // Fixed order: ROAD first, then BRIDGE (so subgame mapping stays consistent).
+    const themes = SORT_THEMES.map((x) => x.id);
 
     return Array.from({ length: numLevels }, (_, i) => ({
       id: i + 1,
@@ -301,6 +324,12 @@ export default class GameScene extends Phaser.Scene {
 
     // Nhận unlock từ DOM (click/tap overlay ngoài Phaser) -> phát voice ngay sau khi unlock.
     window.addEventListener(AUDIO_UNLOCKED_EVENT, this.onAudioUnlocked, { once: true } as AddEventListenerOptions);
+
+    // rotateOrientation.ts sẽ gọi hàm này khi bé xoay ngang lại, để phát voice hướng dẫn
+    // (tránh trường hợp lần click đầu tiên xảy ra trong màn dọc -> chỉ phát voice_rotate).
+    (window as any).playCurrentQuestionVoice = () => {
+      this.playVoiceForLevel(true);
+    };
 
     // Unlock audio once
     this.input.once('pointerdown', () => {
@@ -1119,9 +1148,14 @@ export default class GameScene extends Phaser.Scene {
     const rightCount = smallerLeft ? base + diff : base;
 
     this.time.delayedCall(1200, () => {
+      // Subgame mapping:
+      // - After ROAD: ghép chim hẹp (OP2)
+      // - After BRIDGE: ghép chim rộng (OP1)
+      const balanceSubject = (this.currentTheme === 'ROAD' ? 'BIRDCAGE_DOOR' : 'BIRDCAGE') as any;
       this.scene.start('BalanceScene', {
         leftCount,
         rightCount,
+        subject: balanceSubject,
         nextScene: 'GameScene',
         score: this.score,
         levelIndex: this.levelIndex,
@@ -1148,6 +1182,11 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private playVoiceForLevel(force = false) {
+    // Khi đang ở màn dọc (rotate overlay) thì không phát voice hướng dẫn để tránh chồng với voice_rotate.
+    try {
+      if ((window as any).__rotateOverlayActive__ === true) return;
+    } catch {}
+
     const voiceId = ASSET.voice[this.currentTheme];
     if (!voiceId) return;
 

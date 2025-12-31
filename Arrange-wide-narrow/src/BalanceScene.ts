@@ -3,21 +3,41 @@ import type GameScene from './GameScene';
 import AudioManager from './AudioManager';
 import { resetRotateVoiceLock, playVoiceLocked } from './rotateOrientation';
 
-type Subject = 'BIRDCAGE';
+type Subject = 'BIRDCAGE' | 'BIRDCAGE_DOOR';
 type Side = 'LEFT' | 'RIGHT';
 
 /* ===================== ASSET MAP ===================== */
 
-// base nhân vật trái/phải theo subject
-const BASE_CHARACTER_TEXTURE: Record<Subject, { left: string; right: string }> = {
-  BIRDCAGE: { left: 'birdcage_left', right: 'birdcage_right' }, // <-- đổi key theo asset thật
+type BalanceVariantConfig = {
+  baseTextures: { left: string; right: string };
+  dragTextureKeys: readonly string[];
+  correctIconKey: string;
+  correctTargetTextureKey: string;
+  bannerTextKey?: string; // optional (texture text)
+  guideVoiceKey?: string; // optional (audio key)
 };
 
-// ✅ chỉ 2 biến thể nâng cấp CHUNG cho mỗi subject
-// icon kéo (giữ theo bạn)
-const DRAG_TEXTURES: Record<Subject, string[]> = {
-  BIRDCAGE: ['icon1', 'icon2', 'icon3'], // <-- đổi key theo asset thật
-};
+const BALANCE_VARIANTS: Record<Subject, BalanceVariantConfig> = {
+  // ✅ OP1: ghép icon3 vào chuồng chim (cũ)
+  BIRDCAGE: {
+    baseTextures: { left: 'birdcage_left', right: 'birdcage_right' },
+    dragTextureKeys: ['icon1', 'icon2', 'icon3'],
+    correctIconKey: 'icon3',
+    correctTargetTextureKey: 'birdcage_left',
+    bannerTextKey: 'q_add_birdcage',
+    guideVoiceKey: 'add_birdcage',
+  },
+  // ✅ OP2: ghép "cửa chuồng chim số 2" (hẹp hơn số 1) – cần thêm bộ asset tương ứng.
+  // Bạn chỉ cần preload đúng các key này (hoặc đổi lại cho khớp key asset bạn đặt).
+  BIRDCAGE_DOOR: {
+    baseTextures: { left: 'birdcage2_left', right: 'birdcage2_right' },
+    dragTextureKeys: ['icon1', 'icon2', 'icon3'],
+    correctIconKey: 'icon2',
+    correctTargetTextureKey: 'birdcage2_right',
+    bannerTextKey: 'q_add_birdcage_door',
+    guideVoiceKey: 'add_birdcage_door',
+  },
+} as const;
 
 const BUTTON_ASSET_URLS = {
   replay: 'assets/button/replay.png',
@@ -26,8 +46,8 @@ const BUTTON_ASSET_URLS = {
 
 const RESULT_STAMP_MARGIN = 28;
 const RESULT_STAMP_SIZE = 72;
-const CORRECT_ICON_KEY = 'icon3';
-const CORRECT_TARGET_TEXTURE_KEY = 'birdcage_left';
+
+let lastPickedSubject: Subject | null = null;
 
 /* ===================== ICON3 PLACEMENT TUNING ===================== */
 
@@ -46,7 +66,7 @@ const CORRECT_ICON_PLACEMENT_DEFAULT: CorrectIconPlacement = {
   originY: 1, // bottom
   maxWRatio: 0.5, // chiếm tối đa 55% chiều rộng target
   maxHRatio: 0.5,// chiếm tối đa 55% chiều cao target
-  bottomMarginRatio: 0.13415,// cách đáy target 6% chiều cao target
+  bottomMarginRatio: 0.13,// cách đáy target 6% chiều cao target
   offsetX: 0,// chỉnh dịch chuyển tâm X
   offsetY: 0,// chỉnh dịch chuyển tâm Y
 };
@@ -54,6 +74,8 @@ const CORRECT_ICON_PLACEMENT_DEFAULT: CorrectIconPlacement = {
 // Override theo texture của target (ví dụ: 'birdcage_left', 'birdcage_right')
 const CORRECT_ICON_PLACEMENT_BY_TARGET: Partial<Record<string, Partial<CorrectIconPlacement>>> = {
   // birdcage_left: { offsetX: 10, offsetY: -6, maxWRatio: 0.6, bottomMarginRatio: 0.04 },
+  // OP2: icon2 bị to trên target bên phải -> giảm tỉ lệ tối đa để icon nhỏ hơn.
+  birdcage2_right: { maxWRatio: 0.34, maxHRatio: 0.34, bottomMarginRatio: 0.13 },
 };
 
 /* ===================== DROP TARGET (CÁCH 2) ===================== */
@@ -118,7 +140,15 @@ export default class BalanceScene extends Phaser.Scene {
   }
 
   init(data: BalanceInitData) {
-    this.subject = data.subject ?? 'BIRDCAGE';
+    if (data.subject) {
+      this.subject = data.subject;
+    } else {
+      const subjects = Object.keys(BALANCE_VARIANTS) as Subject[];
+      const candidates = subjects.length > 1 && lastPickedSubject ? subjects.filter((s) => s !== lastPickedSubject) : subjects;
+      const picked = candidates[Math.floor(Math.random() * candidates.length)] ?? 'BIRDCAGE';
+      this.subject = picked;
+      lastPickedSubject = picked;
+    }
     this.nextSceneKey = data.nextScene ?? 'GameScene';
     this.score = data.score ?? 0;
     this.levelIndex = data.levelIndex ?? 0;
@@ -154,9 +184,10 @@ export default class BalanceScene extends Phaser.Scene {
   }
 
   private getCorrectTargetSprite(): Phaser.GameObjects.Image | undefined {
-    // Theo yêu cầu: hình "left" là birdcage_left -> ưu tiên đúng sprite có texture này.
-    if (this.leftBase?.texture?.key === CORRECT_TARGET_TEXTURE_KEY) return this.leftBase;
-    if (this.rightBase?.texture?.key === CORRECT_TARGET_TEXTURE_KEY) return this.rightBase;
+    const variant = BALANCE_VARIANTS[this.subject];
+    const targetKey = variant?.correctTargetTextureKey ?? 'birdcage_left';
+    if (this.leftBase?.texture?.key === targetKey) return this.leftBase;
+    if (this.rightBase?.texture?.key === targetKey) return this.rightBase;
     return this.leftBase ?? this.rightBase;
   }
 
@@ -227,6 +258,34 @@ export default class BalanceScene extends Phaser.Scene {
 
     this.input.dragDistanceThreshold = DRAG_DISTANCE_THRESHOLD;
 
+    // Fallback an toàn nếu chưa kịp thêm asset cho OP2.
+    const pickActiveVariant = (): BalanceVariantConfig => {
+      const requested = BALANCE_VARIANTS[this.subject];
+      const isVariantReady = (v: BalanceVariantConfig) => {
+        if (!this.textures.exists(v.baseTextures.left) || !this.textures.exists(v.baseTextures.right)) return false;
+        if (!v.dragTextureKeys.every((k) => this.textures.exists(k))) return false;
+        if (v.bannerTextKey && !this.textures.exists(v.bannerTextKey)) return false;
+        return true;
+      };
+
+      if (requested && isVariantReady(requested)) return requested;
+
+      if (requested) {
+        const missing: string[] = [];
+        if (!this.textures.exists(requested.baseTextures.left)) missing.push(requested.baseTextures.left);
+        if (!this.textures.exists(requested.baseTextures.right)) missing.push(requested.baseTextures.right);
+        for (const k of requested.dragTextureKeys) if (!this.textures.exists(k)) missing.push(k);
+        if (requested.bannerTextKey && !this.textures.exists(requested.bannerTextKey)) missing.push(requested.bannerTextKey);
+        if (missing.length) console.warn('[BalanceScene] Missing assets for variant:', this.subject, missing);
+      }
+
+      const fallback = BALANCE_VARIANTS.BIRDCAGE;
+      return isVariantReady(fallback) ? fallback : requested;
+    };
+
+    const variant = pickActiveVariant();
+    this.subject = (Object.keys(BALANCE_VARIANTS) as Subject[]).find((k) => BALANCE_VARIANTS[k] === variant) ?? this.subject;
+
     // Nếu bé click nhanh/spam -> ngắt voice hướng dẫn.
     this.input.on('pointerdown', () => {
       const now = this.time?.now ?? Date.now();
@@ -288,7 +347,7 @@ export default class BalanceScene extends Phaser.Scene {
       .setScale(0.45, 0.5)
       .setDepth(20);
 
-    const bannerTextKey = 'q_add_birdcage';
+    const bannerTextKey = variant.bannerTextKey ?? 'q_add_birdcage';
     if (this.textures.exists(bannerTextKey)) {
       if (this.bannerPromptImage && !(this.bannerPromptImage.scene as any)?.sys) {
         this.bannerPromptImage = undefined;
@@ -323,8 +382,8 @@ export default class BalanceScene extends Phaser.Scene {
       .setDepth(12);
 
     /* ===================== 2 NHÂN VẬT (TRÁI + PHẢI) ===================== */
-    const baseL = BASE_CHARACTER_TEXTURE[this.subject].left;
-    const baseR = BASE_CHARACTER_TEXTURE[this.subject].right;
+    const baseL = variant.baseTextures.left;
+    const baseR = variant.baseTextures.right;
 
     const texL = this.textures.get(baseL).getSourceImage() as HTMLImageElement;
     const texR = this.textures.get(baseR).getSourceImage() as HTMLImageElement;
@@ -362,8 +421,8 @@ export default class BalanceScene extends Phaser.Scene {
     this.rightBase = this.add.image(this.rightActorCenterX, this.actorY, rightKey).setScale(charScale).setOrigin(0.5);
 
     /* ===================== ICON KÉO ===================== */
-    // Random đổi thứ tự icon (icon1/icon2/icon3)
-    const dragKeys = Phaser.Utils.Array.Shuffle([...DRAG_TEXTURES[this.subject]]);
+    // Random đổi thứ tự icon
+    const dragKeys = Phaser.Utils.Array.Shuffle([...variant.dragTextureKeys]);
     const dragCount = dragKeys.length;
 
     const usableW = panelW * 0.35;
@@ -468,7 +527,7 @@ export default class BalanceScene extends Phaser.Scene {
         const target = this.getCorrectTargetSprite();
 
         let isCorrectDrop = false;
-        if (inPanel && target && dragKey === CORRECT_ICON_KEY) {
+        if (inPanel && target && dragKey === variant.correctIconKey) {
           isCorrectDrop = this.isPointInsideTargetStrict(target, icon.x, icon.y);
         }
 
@@ -513,7 +572,7 @@ export default class BalanceScene extends Phaser.Scene {
     }
 
     /* ===================== Voice hướng dẫn ===================== */
-    this.guideVoiceKey = 'add_birdcage'; // <-- preload key này
+    this.guideVoiceKey = variant.guideVoiceKey; // optional
 
     if (this.guideVoiceKey && !AudioManager.isPlaying(this.guideVoiceKey)) {
       playVoiceLocked(this.sound, this.guideVoiceKey);

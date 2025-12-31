@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import AudioManager from './AudioManager';
 
 export default class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -73,12 +72,18 @@ export default class PreloadScene extends Phaser.Scene {
 
     // --- BalanceScene banner prompt (optional) ---
     this.load.image('q_add_birdcage', 'assets/text/add-bird.png');
+    // --- BalanceScene OP2 banner prompt (optional) ---
+    this.load.image('q_add_birdcage_door', 'assets/text/add-bird2.png');
 
     this.load.image('birdcage_left', 'assets/icon/Group 388.png');
     this.load.image('birdcage_right', 'assets/icon/Group 389.png');
     this.load.image('icon1', 'assets/icon/Vector 12.png');
     this.load.image('icon2', 'assets/icon/Vector 13.png');
     this.load.image('icon3', 'assets/icon/Vector 14.png');
+
+    // --- BalanceScene OP2: "cửa chuồng chim số 2 hẹp hơn số 1" (thêm bộ asset theo các path này) ---
+    this.load.image('birdcage2_left', 'assets/icon/Group 420.png');
+    this.load.image('birdcage2_right', 'assets/icon/Group 421.png');
 
     /* =============================
      * DEBUG: LOG lỗi khi asset thiếu
@@ -89,11 +94,6 @@ export default class PreloadScene extends Phaser.Scene {
   }
 
   create() {
-    // BGM (nếu có)
-    try {
-      AudioManager.play('bgm_main');
-    } catch {}
-
     // Chuyển vào GameScene hoặc ArrangeWidthScene
     this.scene.start('GameScene', { mode: 'ROAD', levelIndex: 0 });
   }
