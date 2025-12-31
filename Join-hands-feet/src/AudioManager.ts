@@ -10,9 +10,9 @@ interface SoundConfig {
 const BASE_PATH = 'assets/audio/';
 
 const SOUND_MAP: Record<string, SoundConfig> = {
-  sfx_correct: { src: `${BASE_PATH}correct.mp3`, volume: 0.7 },
-  sfx_wrong: { src: `${BASE_PATH}wrong.mp3`, volume: 0.7 },
-  sfx_click: { src: `${BASE_PATH}click.mp3`, volume: 0.7 },
+  sfx_correct: { src: `${BASE_PATH}correct.mp3`, volume: 0.6 },
+  sfx_wrong: { src: `${BASE_PATH}wrong.mp3`, volume: 0.6 },
+  sfx_click: { src: `${BASE_PATH}click.mp3`, volume: 0.6 },
   voice_rotate: { src: `${BASE_PATH}xoay.mp3`, volume: 0.8 },
 
   correct_answer_1: { src: `${BASE_PATH}correct_answer_1.mp3`, volume: 1.0 },
@@ -20,14 +20,14 @@ const SOUND_MAP: Record<string, SoundConfig> = {
   correct_answer_3: { src: `${BASE_PATH}correct_answer_3.mp3`, volume: 1.0 },
   correct_answer_4: { src: `${BASE_PATH}correct_answer_4.mp3`, volume: 1.0 },
 
-  bgm_main: { src: `${BASE_PATH}bgm_main.mp3`, loop: true, volume: 0.35, html5: false },
+  bgm_main: { src: `${BASE_PATH}bgm_main.mp3`, loop: true, volume: 0.3, html5: false },
 
   complete: { src: `${BASE_PATH}vic_sound.mp3` },
   voice_intro: { src: `${BASE_PATH}voice_intro.mp3` },
   voice_join: { src: `${BASE_PATH}join.mp3`, volume: 1.0 },
   voice_need_finish: { src: `${BASE_PATH}voice_need_finish.mp3` },
 
-  voice_complete: { src: `${BASE_PATH}complete.mp3`, volume: 0.5 },
+  voice_complete: { src: `${BASE_PATH}complete.mp3`, volume: 0.35 },
   fireworks: { src: `${BASE_PATH}fireworks.mp3`, volume: 1.0 },
   applause: { src: `${BASE_PATH}applause.mp3`, volume: 1.0 },
 };

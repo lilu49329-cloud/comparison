@@ -35,6 +35,7 @@ const ITEM_TEXTURE: Record<ItemId, string> = {
 const CONNECT_LINE_KEY = 'connect_line';
 const HINT_IMG_KEY = 'connect_hint';
 const ITEMS_BOARD_KEY = 'banner_question';
+const GUIDE_HAND_KEY = 'guide_hand';
 
 const LEFT_IDS: readonly LeftItemId[] = ['HAND_SMALL', 'HAND_BIG', 'FEET_SMALL', 'FEET_BIG'] as const;
 const RIGHT_IDS: readonly RightItemId[] = ['GLOVE_SMALL', 'GLOVE_BIG', 'SHOE_SMALL', 'SHOE_BIG'] as const;
@@ -48,13 +49,13 @@ const RIGHT_MATCH_KEY: Record<RightItemId, MatchKey> = {
 
 /* ===================== SCALE ===================== */
 
-const ITEM_SCALE = 2.0;
+const ITEM_SCALE = 3.0;
 const PROMPT_IMG_SCALE = 0.55;
 const LINE_THICKNESS = 12;
 const LINE_END_EXTEND = 5;
 const LINE_DRAG_START_EXTEND = 10;
-const ITEM_FILL_RATIO = 0.9;
-const ITEMS_SHIFT_FROM_BANNER = 25;
+const ITEM_FILL_RATIO = 0.94;
+const ITEMS_SHIFT_FROM_BANNER = 0;
 
 /* ===================== HOLE ANCHOR ===================== */
 
@@ -66,13 +67,13 @@ const HOLE_BOX_RIGHT = { left: 472, top: 126, width: 40, height: 40 } as const;
 
 /* ===================== LAYOUT ===================== */
 
-const BANNER_Y = 60;
-const BANNER_SCALE = 0.52;
+const BANNER_Y = 42;
+const BANNER_SCALE = 0.46;
 const BANNER_MAX_W_RATIO = 0.6;
 
 const PROMPT_FONT_SIZE = 30;
 const FEEDBACK_FONT_SIZE = 22;
-const FEEDBACK_BOTTOM_MARGIN = 40;
+const FEEDBACK_BOTTOM_MARGIN = 0;
 
 const SIDE_CHAR_KEY = 'char';
 const SIDE_CHAR_BASE_SCALE = 0.4;
@@ -81,21 +82,26 @@ const SIDE_CHAR_BOARD_GAP_RATIO = 0.02;
 const SIDE_CHAR_BOARD_MAX_H_RATIO = 0.95;
 const SIDE_CHAR_BOB_RATIO = 0.015;
 
-const ITEMS_GAP_FROM_BANNER = 70;
-const ITEMS_GAP_FROM_FEEDBACK = 60;
+const ITEMS_GAP_FROM_BANNER = 6;
+const ITEMS_GAP_FROM_FEEDBACK = 4;
 
-const COLUMN_GAP_RATIO = 0.38;
-const COLUMN_GAP_MIN = 220;
+const COLUMN_GAP_RATIO = 0.32;
+const COLUMN_GAP_MIN = 120;
 const COLUMN_GAP_MAX = 520;
 
-const ITEMS_BOARD_PAD_X = 50;
-const ITEMS_BOARD_PAD_Y = 20;
+const ITEMS_BOARD_PAD_X = 24;
+const ITEMS_BOARD_PAD_Y = 12;
+const ITEMS_BOARD_EXTRA_H = 100;
 const ITEMS_BOARD_DEPTH = 4;
 
 const ITEM_DEPTH = 5;
 const LINE_DEPTH = 6;
 const LINE_CAP_RADIUS = Math.max(3, LINE_THICKNESS * 0.55);
 const CHAR_DEPTH = 5;
+const GUIDE_HAND_DEPTH = 50;
+const GUIDE_HAND_SCALE = 0.55;
+const GUIDE_HAND_OFFSET_X = -18;
+const GUIDE_HAND_OFFSET_Y = 18;
 
 /* ===================== SCENE ===================== */
 
@@ -131,6 +137,10 @@ export default class GameScene extends Phaser.Scene {
   private wrongLine?: Phaser.GameObjects.Image;
   private wrongLineSeg?: { x1: number; y1: number; x2: number; y2: number };
   private audioReady = false;
+  private guideHand?: Phaser.GameObjects.Image;
+  private guideHandTween?: Phaser.Tweens.Tween;
+  private guideHandMatchKey?: MatchKey;
+  private guideHandShownOnce = false;
   private readonly onAudioUnlocked = () => {
     (async () => {
       const win = window as unknown as Record<string, unknown>;
@@ -162,6 +172,8 @@ export default class GameScene extends Phaser.Scene {
     this.wrongLine = undefined;
     this.wrongLineSeg = undefined;
     this.gameState = 'INTRO';
+    this.destroyGuideHand();
+    this.guideHandShownOnce = false;
 
     const win = window as unknown as Record<string, unknown>;
     this.audioReady = !!win[AUDIO_UNLOCKED_KEY];
@@ -324,6 +336,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.input.on('dragstart', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject) => {
       AudioManager.stop('voice_join');
+      this.destroyGuideHand();
       const img = gameObject as Phaser.GameObjects.Image;
       const matchKey = img.getData('matchKey') as MatchKey | undefined;
       if (!matchKey || this.matched.has(matchKey) || this.gameState === 'LEVEL_END') return;
@@ -416,53 +429,84 @@ export default class GameScene extends Phaser.Scene {
 
     this.questionBanner.setScale(bannerScaleX, bannerScaleY);
 
-    const topPadding = Math.max(22, height * 0.04);
+    const topPadding = Math.max(22, height * 0.02);
     const bannerY = Math.max(BANNER_Y, topPadding + this.questionBanner.displayHeight / 2);
-    this.questionBanner.setPosition(centerX, bannerY);
+    this.questionBanner.setPosition(Math.round(centerX), Math.round(bannerY));
     this.promptText.setPosition(this.questionBanner.x, this.questionBanner.y);
     this.promptImage?.setPosition(this.questionBanner.x, this.questionBanner.y);
 
     const bottomEdge = height;
     const feedbackY = bottomEdge - FEEDBACK_BOTTOM_MARGIN;
-    this.feedbackText.setPosition(centerX, feedbackY);
+    this.feedbackText.setPosition(Math.round(centerX), Math.round(feedbackY));
 
     const itemsTop =
       this.questionBanner.y +
       this.questionBanner.displayHeight / 2 +
-      Math.max(ITEMS_GAP_FROM_BANNER, height * 0.04) +
+      Math.max(ITEMS_GAP_FROM_BANNER, height * 0.008) +
       ITEMS_SHIFT_FROM_BANNER;
     const itemsBottom =
-      feedbackY - this.feedbackText.displayHeight / 2 - Math.max(ITEMS_GAP_FROM_FEEDBACK, height * 0.06);
+      feedbackY - this.feedbackText.displayHeight / 2 - Math.max(ITEMS_GAP_FROM_FEEDBACK, height * 0.015);
     const safeItemsBottom = Math.max(itemsTop + 1, itemsBottom);
-    const yPositions = this.getYPositions(LEFT_IDS.length, itemsTop, safeItemsBottom);
 
-    const span = Math.max(1, safeItemsBottom - itemsTop);
-    const gap = LEFT_IDS.length > 1 ? span / (LEFT_IDS.length - 1) : span;
-    const maxAllowedItemH = Math.max(46, gap * ITEM_FILL_RATIO);
     const maxSrcH = Math.max(
       1,
       ...this.leftItems.map((i) => i.height ?? 0),
       ...this.rightItems.map((i) => i.height ?? 0),
     );
-    this.currentItemScale = Math.min(ITEM_SCALE, maxAllowedItemH / maxSrcH);
-    this.leftItems.forEach((i) => i.setScale(this.currentItemScale));
-    this.rightItems.forEach((i) => i.setScale(this.currentItemScale));
+    const maxSrcW = Math.max(
+      1,
+      ...this.leftItems.map((i) => i.width ?? 0),
+      ...this.rightItems.map((i) => i.width ?? 0),
+    );
 
-    const columnGap = Math.min(COLUMN_GAP_MAX, Math.max(COLUMN_GAP_MIN, width * COLUMN_GAP_RATIO));
-    const leftX = centerX - columnGap / 2;
-    const rightX = centerX + columnGap / 2;
-
-    for (let i = 0; i < this.leftItems.length; i++) {
-      // HAND/FEET column on the right
-      this.leftItems[i].setPosition(rightX, yPositions[i] ?? 0);
-    }
-    for (let i = 0; i < this.rightItems.length; i++) {
-      // GLOVE/SHOE column on the left
-      this.rightItems[i].setPosition(leftX, yPositions[i] ?? 0);
-    }
-
-    let bounds: Phaser.Geom.Rectangle | undefined;
     if (this.itemsBoard && this.itemsBoard.scene) {
+      // Make the board wrap all items (no overflow), within the available area.
+      const maxBoardW = width * 1.0;
+      const maxBoardH = Math.max(1, safeItemsBottom - itemsTop);
+
+      const maxInnerW = Math.max(1, maxBoardW - ITEMS_BOARD_PAD_X * 2);
+      const maxInnerH = Math.max(1, maxBoardH - ITEMS_BOARD_PAD_Y * 2);
+
+      // 1) Decide item scale to fit within maxInnerW/maxInnerH.
+      const count = LEFT_IDS.length;
+      const heightDivisor = (count > 1 ? (count - 1) / ITEM_FILL_RATIO : 0) + 1;
+      const maxAllowedItemH = Math.max(46, maxInnerH / heightDivisor);
+      const scaleByHeight = maxAllowedItemH / maxSrcH;
+
+      // Smaller gap between 2 columns for a tighter layout.
+      let columnGap = Math.min(COLUMN_GAP_MAX, Math.max(COLUMN_GAP_MIN, maxInnerW * 0.48));
+      let scaleByWidth = (maxInnerW - columnGap) / maxSrcW;
+
+      this.currentItemScale = Math.min(ITEM_SCALE, scaleByHeight, scaleByWidth);
+      const maxItemW = maxSrcW * this.currentItemScale;
+      if (columnGap + maxItemW > maxInnerW) {
+        columnGap = Math.max(COLUMN_GAP_MIN, maxInnerW - maxItemW);
+        scaleByWidth = (maxInnerW - columnGap) / maxSrcW;
+        this.currentItemScale = Math.min(ITEM_SCALE, scaleByHeight, scaleByWidth);
+      }
+      this.leftItems.forEach((i) => i.setScale(this.currentItemScale));
+      this.rightItems.forEach((i) => i.setScale(this.currentItemScale));
+
+      // 2) Layout items inside the available vertical span first.
+      const boardY = (itemsTop + safeItemsBottom) / 2;
+      const maxItemH = maxSrcH * this.currentItemScale;
+      const centersSpan = Math.max(1, maxInnerH - maxItemH);
+      const innerTop = boardY - centersSpan / 2;
+      const innerBottom = boardY + centersSpan / 2;
+      const yPositions = this.getYPositions(LEFT_IDS.length, innerTop, innerBottom);
+
+      const leftX = centerX - columnGap / 2;
+      const rightX = centerX + columnGap / 2;
+
+      for (let i = 0; i < this.leftItems.length; i++) {
+        this.leftItems[i].setPosition(rightX, yPositions[i] ?? boardY);
+      }
+      for (let i = 0; i < this.rightItems.length; i++) {
+        this.rightItems[i].setPosition(leftX, yPositions[i] ?? boardY);
+      }
+
+      // 3) Resize the board to cover all items with padding.
+      let bounds: Phaser.Geom.Rectangle | undefined;
       const all = [...this.leftItems, ...this.rightItems];
       const first = all[0];
       if (first) {
@@ -471,50 +515,89 @@ export default class GameScene extends Phaser.Scene {
           const b = all[i].getBounds();
           Phaser.Geom.Rectangle.Union(bounds, b, bounds);
         }
-        this.itemsBoard
-          .setPosition(bounds.centerX, bounds.centerY)
-          .setDisplaySize(bounds.width + ITEMS_BOARD_PAD_X * 2, bounds.height + ITEMS_BOARD_PAD_Y * 2);
+      }
+
+      const fallbackW = Math.min(maxBoardW, maxInnerW + ITEMS_BOARD_PAD_X * 2);
+      const fallbackH = Math.min(maxBoardH, maxInnerH + ITEMS_BOARD_PAD_Y * 2);
+      const boardW = Math.min(maxBoardW, (bounds?.width ?? fallbackW) + ITEMS_BOARD_PAD_X * 2);
+      const boardH = Math.min(maxBoardH, (bounds?.height ?? fallbackH) + ITEMS_BOARD_PAD_Y * 2 + ITEMS_BOARD_EXTRA_H);
+      const boardX = bounds?.centerX ?? centerX;
+      this.itemsBoard
+        .setPosition(Math.round(boardX), Math.round(boardY))
+        .setDisplaySize(Math.round(boardW), Math.round(boardH));
+
+      // 4) If we have a side character, position the group and (if needed) shrink character only.
+      if (this.sideCharacter) {
+        const baseScale = (height / 720) * SIDE_CHAR_BASE_SCALE;
+        const maxCharH = Math.max(1, boardH * SIDE_CHAR_BOARD_MAX_H_RATIO);
+        let charScale = Math.min(baseScale, maxCharH / Math.max(1, this.sideCharacter.height));
+        this.sideCharacter.setScale(charScale);
+
+        const gap = Math.max(SIDE_CHAR_BOARD_GAP_MIN, width * SIDE_CHAR_BOARD_GAP_RATIO);
+        const maxGroupW = width * 0.96;
+        const groupW = this.sideCharacter.displayWidth + gap + boardW;
+        if (groupW > maxGroupW) {
+          const availableForChar = Math.max(1, maxGroupW - gap - boardW);
+          const shrink = Math.min(1, availableForChar / Math.max(1, this.sideCharacter.displayWidth));
+          charScale *= shrink;
+          this.sideCharacter.setScale(charScale);
+        }
+
+        const finalGroupW = this.sideCharacter.displayWidth + gap + boardW;
+        const groupLeft = centerX - finalGroupW / 2;
+        const charX = groupLeft + this.sideCharacter.displayWidth / 2;
+        const newBoardX = groupLeft + this.sideCharacter.displayWidth + gap + boardW / 2;
+
+        const dx = newBoardX - this.itemsBoard.x;
+        if (dx !== 0) {
+          this.itemsBoard.setX(this.itemsBoard.x + dx);
+          this.leftItems.forEach((i) => i.setX(i.x + dx));
+          this.rightItems.forEach((i) => i.setX(i.x + dx));
+        }
+
+        const charBottomY = Math.min(height - 10, boardY + boardH / 2);
+        this.sideCharacter.setPosition(charX, charBottomY);
+
+        this.tweens.killTweensOf(this.sideCharacter);
+        this.tweens.add({
+          targets: this.sideCharacter,
+          y: this.sideCharacter.y - height * SIDE_CHAR_BOB_RATIO,
+          duration: 900,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.inOut',
+        });
+        this.sideCharacter.setAngle(0);
+      }
+    } else {
+      const yPositions = this.getYPositions(LEFT_IDS.length, itemsTop, safeItemsBottom);
+
+      const span = Math.max(1, safeItemsBottom - itemsTop);
+      const gap = LEFT_IDS.length > 1 ? span / (LEFT_IDS.length - 1) : span;
+      const maxAllowedItemH = Math.max(46, gap * ITEM_FILL_RATIO);
+
+      // Smaller gap between 2 columns for a tighter layout.
+      const columnGap = Math.min(COLUMN_GAP_MAX, Math.max(COLUMN_GAP_MIN, width * COLUMN_GAP_RATIO));
+      const leftX = centerX - columnGap / 2;
+      const rightX = centerX + columnGap / 2;
+      const maxAllowedItemW = Math.max(60, columnGap * 0.82);
+
+      this.currentItemScale = Math.min(ITEM_SCALE, maxAllowedItemH / maxSrcH, maxAllowedItemW / maxSrcW);
+      this.leftItems.forEach((i) => i.setScale(this.currentItemScale));
+      this.rightItems.forEach((i) => i.setScale(this.currentItemScale));
+
+      for (let i = 0; i < this.leftItems.length; i++) {
+        // HAND/FEET column on the right
+        this.leftItems[i].setPosition(rightX, yPositions[i] ?? 0);
+      }
+      for (let i = 0; i < this.rightItems.length; i++) {
+        // GLOVE/SHOE column on the left
+        this.rightItems[i].setPosition(leftX, yPositions[i] ?? 0);
       }
     }
 
-    if (this.itemsBoard && this.sideCharacter && bounds) {
-      const boardW = this.itemsBoard.displayWidth;
-      const boardH = this.itemsBoard.displayHeight;
-
-      const baseScale = (height / 720) * SIDE_CHAR_BASE_SCALE;
-      const maxCharH = Math.max(1, boardH * SIDE_CHAR_BOARD_MAX_H_RATIO);
-      const charScale = Math.min(baseScale, maxCharH / Math.max(1, this.sideCharacter.height));
-      this.sideCharacter.setScale(charScale);
-
-      const gap = Math.max(SIDE_CHAR_BOARD_GAP_MIN, width * SIDE_CHAR_BOARD_GAP_RATIO);
-      const groupW = this.sideCharacter.displayWidth + gap + boardW;
-      const groupLeft = centerX - groupW / 2;
-      const charX = groupLeft + this.sideCharacter.displayWidth / 2;
-      const boardX = groupLeft + this.sideCharacter.displayWidth + gap + boardW / 2;
-
-      const dx = boardX - bounds.centerX;
-      if (dx !== 0) {
-        this.leftItems.forEach((i) => i.setX(i.x + dx));
-        this.rightItems.forEach((i) => i.setX(i.x + dx));
-      }
-
-      const boardY = bounds.centerY;
-      this.itemsBoard.setPosition(boardX, boardY);
-
-      const charBottomY = Math.min(height - 10, boardY + this.itemsBoard.displayHeight / 2);
-      this.sideCharacter.setPosition(charX, charBottomY);
-
-      this.tweens.killTweensOf(this.sideCharacter);
-      this.tweens.add({
-        targets: this.sideCharacter,
-        y: this.sideCharacter.y - height * SIDE_CHAR_BOB_RATIO,
-        duration: 900,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.inOut',
-      });
-      this.sideCharacter.setAngle(0);
-    }
+    // Keep guide aligned after resize/layout changes.
+    this.refreshGuideHand(true);
 
     this.updateHintForRound();
     this.redrawConnections();
@@ -537,6 +620,96 @@ export default class GameScene extends Phaser.Scene {
     this.resetUiForNewTry();
     this.playInstructionVoiceOnce();
     this.gameState = 'INTRO';
+    this.scheduleGuideHand();
+  }
+
+  private scheduleGuideHand() {
+    if (this.guideHandShownOnce) return;
+    if (!this.textures.exists(GUIDE_HAND_KEY)) return;
+
+    this.time.delayedCall(450, () => {
+      if (!this.scene.isActive()) return;
+      if (this.guideHandShownOnce) return;
+      if (this.matched.size > 0) return;
+      if (this.gameState === 'LEVEL_END') return;
+      this.startGuideHand();
+    });
+  }
+
+  private startGuideHand() {
+    if (this.guideHandShownOnce) return;
+    if (!this.textures.exists(GUIDE_HAND_KEY)) return;
+
+    const matchKey = this.leftOrder[0] ?? (this.leftItems[0]?.getData('matchKey') as MatchKey | undefined);
+    if (!matchKey) return;
+
+    const leftImg = this.leftItems.find((i) => i.getData('matchKey') === matchKey);
+    const rightImg = this.rightItems.find((i) => i.getData('matchKey') === matchKey);
+    if (!leftImg || !rightImg) return;
+
+    this.guideHandShownOnce = true;
+    this.guideHandMatchKey = matchKey;
+
+    const baseScale = (this.scale.height / 720) * GUIDE_HAND_SCALE;
+    const scale = Math.min(1.1, Math.max(0.35, baseScale));
+
+    if (!this.guideHand) {
+      this.guideHand = this.add.image(0, 0, GUIDE_HAND_KEY).setOrigin(0.2, 0.15).setDepth(GUIDE_HAND_DEPTH);
+    } else {
+      this.guideHand.setTexture(GUIDE_HAND_KEY).setVisible(true);
+    }
+
+    this.guideHand.setAlpha(0.95).setScale(scale).setAngle(-8);
+    this.refreshGuideHand(true);
+
+    // Dismiss as soon as the kid touches/starts dragging.
+    this.input.once('pointerdown', () => this.destroyGuideHand());
+  }
+
+  private refreshGuideHand(restartTween = false) {
+    if (!this.guideHand || !this.guideHandMatchKey) return;
+    const matchKey = this.guideHandMatchKey;
+
+    const leftImg = this.leftItems.find((i) => i.getData('matchKey') === matchKey);
+    const rightImg = this.rightItems.find((i) => i.getData('matchKey') === matchKey);
+    if (!leftImg || !rightImg) return;
+
+    const start = this.getHoleWorldPoint(leftImg);
+    const end = this.getHoleWorldPoint(rightImg);
+
+    const s = this.guideHand.scaleX;
+    const startX = start.x + GUIDE_HAND_OFFSET_X * s;
+    const startY = start.y + GUIDE_HAND_OFFSET_Y * s;
+    const endX = end.x + GUIDE_HAND_OFFSET_X * s;
+    const endY = end.y + GUIDE_HAND_OFFSET_Y * s;
+
+    if (restartTween) {
+      this.guideHandTween?.stop();
+      this.guideHandTween = undefined;
+    }
+
+    this.guideHand.setPosition(startX, startY).setVisible(true);
+
+    if (!this.guideHandTween) {
+      this.guideHandTween = this.tweens.add({
+        targets: this.guideHand,
+        x: endX,
+        y: endY,
+        duration: 850,
+        yoyo: true,
+        repeat: -1,
+        repeatDelay: 320,
+        ease: 'Sine.inOut',
+      });
+    }
+  }
+
+  private destroyGuideHand() {
+    this.guideHandTween?.stop();
+    this.guideHandTween = undefined;
+    this.guideHandMatchKey = undefined;
+    this.guideHand?.destroy();
+    this.guideHand = undefined;
   }
 
   private updateHintForRound() {
@@ -592,6 +765,7 @@ export default class GameScene extends Phaser.Scene {
   private checkMatch(left: MatchKey, right: MatchKey) {
     if (this.gameState === 'LEVEL_END') return;
     this.gameState = 'CHECKING';
+    this.destroyGuideHand();
 
     const leftImg = this.leftItems.find((i) => i.getData('matchKey') === left);
     const rightImg = this.rightItems.find((i) => i.getData('matchKey') === right);

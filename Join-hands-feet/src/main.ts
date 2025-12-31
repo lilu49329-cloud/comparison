@@ -17,19 +17,7 @@ function markAudioUnlocked() {
 }
 
 function unlockAudioFromUserGesture() {
-  try {
-    markAudioUnlocked();
-  } catch {}
-
-  (async () => {
-    try {
-      await AudioManager.unlockAndWarmup?.();
-    } catch {}
-
-    try {
-      AudioManager.playWhenReady?.("bgm_main");
-    } catch {}
-  })();
+  ensureBgmStarted();
 }
 
 function setupGlobalAudioUnlock() {
@@ -148,8 +136,22 @@ let game: Phaser.Game | null = null;
 
 export function ensureBgmStarted() {
   console.log("[BGM] ensure play bgm_main");
-  // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
-  if (!AudioManager.isPlaying("bgm_main")) AudioManager.playWhenReady?.("bgm_main");
+  // ensureBgmStarted() is only called from a user gesture (overlay / button / first click),
+  // so it's safe to mark audio as unlocked here even when rotate overlay blocks propagation.
+  try {
+    markAudioUnlocked();
+  } catch {}
+
+  (async () => {
+    try {
+      await AudioManager.unlockAndWarmup?.();
+    } catch {}
+
+    try {
+      // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
+      if (!AudioManager.isPlaying("bgm_main")) AudioManager.playWhenReady?.("bgm_main");
+    } catch {}
+  })();
 }
 
 
@@ -182,6 +184,10 @@ export function ensureBgmStarted() {
 }));
 
 // ================== CẤU HÌNH PHASER ==================
+// Increase internal canvas resolution to reduce blur (especially when Scale.FIT stretches the canvas).
+// Cap to avoid heavy GPU cost on very high-DPR devices.
+const RENDER_RESOLUTION = Math.min(3, window.devicePixelRatio || 1);
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   width: 1280,
@@ -195,11 +201,16 @@ const config: Phaser.Types.Core.GameConfig = {
   render: {
     pixelArt: false,
     antialias: true,
+    roundPixels: true,
   },
   // Chạy PreloadScene trước để load toàn bộ asset, rồi mới vào GameScene
   scene: [PreloadScene, GameScene, EndGameScene],
 };
 
+// Phaser supports these, but the TS type in this project doesn't declare them.
+(config as any).resolution = RENDER_RESOLUTION;
+(config as any).render = (config as any).render ?? {};
+(config as any).render.antialiasGL = true;
 // ================== KẾT NỐI NÚT HTML (ngoài Phaser) ==================
 function setupHtmlButtons() {
   const replayBtn = document.getElementById("btn-replay");

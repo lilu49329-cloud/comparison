@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import AudioManager from './AudioManager';
 
 export default class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -67,18 +66,13 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image('hand_big', 'assets/icon/Frame 22.png');
     this.load.image('feet_small', 'assets/icon/Frame 23.png');
     this.load.image('feet_big', 'assets/icon/Frame 24.png');
+    this.load.image('guide_hand', 'assets/icon/hand.png');
 
     // Hint banner (fallback to text if missing)
     this.load.image('connect_hint', 'assets/text/add-text.png');
   }
 
   create() {
-    // Gọi BGM trước, sau đó mới vào GameScene (question sẽ phát trong GameScene.startLevel)
-    try {
-      AudioManager.play('bgm_main');
-    } catch {
-      // nếu audio chưa load vẫn chuyển cảnh bình thường
-    }
     this.scene.start('GameScene');
   }
 }
