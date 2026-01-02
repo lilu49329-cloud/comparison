@@ -264,7 +264,7 @@ export default class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  init(data: { levelIndex?: number; score?: number }) {
+  init(data: { levelIndex?: number; score?: number; keepLevels?: boolean; startIndex?: number } = {}) {
     this.levelIndex = data.levelIndex ?? 0;
     this.level = this.levelIndex;
     this.score = data.score ?? 0;
@@ -306,12 +306,26 @@ export default class GameScene extends Phaser.Scene {
           (lvl as any).itemIds.length === 3,
       );
 
-    if (this.levelIndex === 0 || !hasValidSavedLevels) {
+    const keepLevels = !!data.keepLevels;
+    const shouldGenerateLevels = !hasValidSavedLevels || (!keepLevels && this.levelIndex === 0);
+
+    if (shouldGenerateLevels) {
       const levels = this.generateLevels(totalLevels);
       this.levels = levels;
       (window as any)[globalKey] = { levels };
     } else {
       this.levels = savedState!.levels!;
+    }
+
+    const requestedStartIndex = Number.isFinite(data.startIndex) ? Math.floor(data.startIndex as number) : null;
+    if (requestedStartIndex !== null && this.levels.length > 0) {
+      const n = this.levels.length;
+      const start = ((requestedStartIndex % n) + n) % n;
+      if (start !== 0) {
+        const rotated = [...this.levels.slice(start), ...this.levels.slice(0, start)];
+        this.levels = rotated;
+        (window as any)[globalKey] = { levels: rotated };
+      }
     }
   }
 

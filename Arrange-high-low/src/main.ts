@@ -137,8 +137,7 @@ function getTotalLevels(scene: any): number {
     (Array.isArray(scene?.levelConfigs) ? scene.levelConfigs.length : undefined) ??
     (typeof scene?.getLevelCount === "function" ? scene.getLevelCount() : undefined);
 
-  // Nếu không lấy được, để 1 để khỏi random sai index (tránh crash)
-  return Number.isFinite(n) && n > 0 ? n : 1;
+  return Number.isFinite(n) && n > 0 ? n : 5;
 }
 
 // ================== KẾT NỐI NÚT HTML (ngoài Phaser) ==================
@@ -154,11 +153,14 @@ function setupHtmlButtons() {
       const gs = game.scene.getScene("GameScene") as GameScene | null;
 
       const total = getTotalLevels(gs);
-      const randomIndex = Phaser.Math.Between(0, total - 1);
+      const startIndex = Phaser.Math.Between(0, Math.max(0, total - 1));
 
       const data = {
-        levelIndex: randomIndex,
-        score: (gs as any)?.score ?? 0, // giữ logic cũ: có score thì giữ, không có thì 0
+        // ✅ replay: random vào 1 màn bất kì nhưng vẫn phải chơi đủ toàn bộ màn
+        levelIndex: 0,
+        score: 0,
+        keepLevels: true,
+        startIndex,
       };
 
       // ✅ “ở đâu cũng replay được”: đang ở GameScene thì restart, còn lại thì start GameScene
