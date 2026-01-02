@@ -148,6 +148,21 @@ const BOARD_HEIGHT = BASE_BOARD_HEIGHT * BOARD_SCALE;
 
 const BANNER_Y = 60;
 const BANNER_SCALE = 0.5;
+const BANNER_MIN_WIDTH_RATIO = 0.72; // thu ngắn banner, không thu nhỏ chữ
+
+const HINT_IMAGE_OFFSET_BY_THEME: Partial<Record<SortThemeId, { x: number; y: number }>> = {
+  BOOK: { x: 0, y: -5 },
+  TREE: { x: 0, y: -5 },
+  BUILDING: { x: 0, y: -5 },
+};
+
+const HINT_IMAGE_SCALE_MULTIPLIER_BY_THEME: Partial<Record<SortThemeId, number>> = {
+  BOOK: 0.9,
+  ANIMAL: 0.9,
+  BOY: 0.9,
+  TREE: 0.9,
+  BUILDING: 0.9,
+};
 
 const BOARD_GAP_FROM_BANNER = 30;
 const BOARD_OFFSET_X = 90;
@@ -366,7 +381,7 @@ export default class GameScene extends Phaser.Scene {
     this.questionBanner = this.add
       .image(width / 2, BANNER_Y, ASSET.img.questionBanner)
       .setOrigin(0.5)
-      .setScale(0.5, BANNER_SCALE * BOARD_SCALE)
+      .setScale(BANNER_SCALE * BOARD_SCALE)
       .setDepth(20);
 
  // Cập nhật lại vị trí của promptText để căn giữa theo chiều dọc trong banner
@@ -374,6 +389,8 @@ this.promptText = this.add.text(this.questionBanner.x, this.questionBanner.y, ''
   fontFamily: 'Fredoka, Arial',
   fontSize: `${PROMPT_FONT_SIZE}px`,
   color: '#ffffff',
+  align: 'center',
+  wordWrap: { width: this.questionBanner.displayWidth * 0.82, useAdvancedWrap: true },
 })
   .setOrigin(0.5)
   .setDepth(21);
@@ -385,9 +402,6 @@ this.feedbackText = this.add.text(this.questionBanner.x, this.questionBanner.y +
   color: '#ffffff',
 })
   .setOrigin(0.5);
-console.log('Banner Position:', this.questionBanner.x, this.questionBanner.y);
-console.log('Prompt Text Position:', this.promptText.x, this.promptText.y);
-console.log('Feedback Text Position:', this.feedbackText.x, this.feedbackText.y);
 
 
     this.resultBadge = this.add
@@ -577,8 +591,14 @@ console.log('Feedback Text Position:', this.feedbackText.x, this.feedbackText.y)
   private computeHintUniformScale() {
     const banner = this.questionBanner;
 
-    const targetH = banner.displayHeight * 0.62; // mục tiêu hiển thị theo chiều cao
-    const maxAllowedW = banner.displayWidth * 0.82; // clamp theo bề ngang banner
+    // ✅ Tính theo kích thước banner "gốc" (scale đều X/Y), để việc thu ngắn banner (scaleX)
+    // không làm chữ bị tự thu nhỏ theo.
+    const baseScale = BANNER_SCALE * BOARD_SCALE;
+    const baseBannerW = banner.width * baseScale;
+    const baseBannerH = banner.height * baseScale;
+
+    const targetH = baseBannerH * 0.62; // mục tiêu hiển thị theo chiều cao
+    const maxAllowedW = baseBannerW * 0.82; // clamp theo bề ngang banner
 
     const hintKeys = Object.values(ASSET.hint) as string[];
 
@@ -612,7 +632,40 @@ console.log('Feedback Text Position:', this.feedbackText.x, this.feedbackText.y)
 
   private applyHintUniformScale(img: Phaser.GameObjects.Image) {
     if (!this.hintUniformScaleReady) this.computeHintUniformScale();
-    img.setScale(this.hintUniformScale);
+    const mult = HINT_IMAGE_SCALE_MULTIPLIER_BY_THEME[this.currentTheme] ?? 1;
+    img.setScale(this.hintUniformScale * mult);
+  }
+
+  private resetBannerScale() {
+    const s = BANNER_SCALE * BOARD_SCALE;
+    this.questionBanner.setScale(s, s);
+  }
+
+  private fitBannerWidthToDisplayedContent(displayW: number) {
+    const baseScale = BANNER_SCALE * BOARD_SCALE;
+    const texW = this.questionBanner.width || 1;
+    const maxBannerW = texW * baseScale;
+    const minBannerW = maxBannerW * BANNER_MIN_WIDTH_RATIO;
+
+    if (!displayW) return;
+
+    // 0.82 = content chiếm ~82% bề ngang banner (đồng bộ với computeHintUniformScale)
+    const desiredBannerW = Phaser.Math.Clamp(displayW / 0.82, minBannerW, maxBannerW);
+    const scaleX = desiredBannerW / texW;
+    this.questionBanner.setScale(scaleX, baseScale);
+  }
+
+  private fitBannerWidthToHint() {
+    if (!this.hintImage || !this.hintImage.visible) return;
+    this.fitBannerWidthToDisplayedContent(this.hintImage.displayWidth || 0);
+  }
+
+  private positionHintInBanner() {
+    if (!this.hintImage) return;
+    const bx = this.questionBanner.x;
+    const by = this.questionBanner.y;
+    const offset = HINT_IMAGE_OFFSET_BY_THEME[this.currentTheme] ?? { x: 0, y: 0 };
+    this.hintImage.setPosition(bx + offset.x, by + offset.y);
   }
 
   /* ===================== LAYOUT ===================== */
@@ -628,16 +681,23 @@ console.log('Feedback Text Position:', this.feedbackText.x, this.feedbackText.y)
 
     // Cập nhật vị trí của banner và các đối tượng văn bản
     this.questionBanner.setPosition(bannerX, BANNER_Y);
+    this.resetBannerScale();
     // Căn giữa promptText đúng tâm questionBanner (cả X và Y)
     this.promptText.setPosition(this.questionBanner.x, this.questionBanner.y);
+    this.promptText.setWordWrapWidth(this.questionBanner.displayWidth * 0.82, true);
 
-    // ✅ mỗi lần layout/resize, tính lại uniform scale theo banner hiện tại
+    // ✅ mỗi lần layout/resize, tính lại uniform scale theo banner gốc (không phụ thuộc scaleX)
     this.hintUniformScaleReady = false;
     this.computeHintUniformScale();
 
     if (this.hintImage) {
-      this.hintImage.setPosition(bannerX, BANNER_Y);
-      if (this.hintImage.visible) this.applyHintUniformScale(this.hintImage);
+      this.positionHintInBanner();
+      if (this.hintImage.visible) {
+        this.applyHintUniformScale(this.hintImage);
+        this.positionHintInBanner();
+        this.fitBannerWidthToHint(); // thu ngắn banner theo chữ, không đổi scale chữ
+        this.positionHintInBanner();
+      }
     }
 
     const bannerBottom = this.questionBanner.y + this.questionBanner.displayHeight / 2;
@@ -956,61 +1016,29 @@ private updateHintForLevel() {
   if (hintKey && this.textures.exists(hintKey)) {
     this.promptText.setVisible(false);
 
-    // Lấy vị trí của questionBanner
     const bx = this.questionBanner.x;
     const by = this.questionBanner.y;
 
-    // // Tính toán kích thước của questionBanner
-    // const bannerWidth = this.questionBanner.width;
-    // const bannerHeight = this.questionBanner.height;
+    if (!this.hintImage) this.hintImage = this.add.image(bx, by, hintKey).setOrigin(0.5).setDepth(21);
+    else this.hintImage.setTexture(hintKey).setVisible(true);
 
-    // Cập nhật lại ảnh hint
-    if (!this.hintImage) {
-      this.hintImage = this.add.image(bx, by, hintKey).setOrigin(0.5).setDepth(21);
-    } else {
-      this.hintImage.setTexture(hintKey).setVisible(true);
-    }
-
-    // Cập nhật vị trí của hintImage sao cho căn giữa trong questionBanner
-    const hintWidth = this.hintImage.width;
-    const hintHeight = this.hintImage.height;
-
-    // Điều chỉnh vị trí để căn giữa
-    const hintX = bx - (hintWidth / 2);
-    const hintY = by - (hintHeight / 2);
-
-    this.hintImage.setPosition(hintX, hintY);
+    this.resetBannerScale();
+    this.hintUniformScaleReady = false;
+    this.computeHintUniformScale();
 
     // Áp dụng uniform scale nếu cần
     this.applyHintUniformScale(this.hintImage);
-
-    // Điều chỉnh thủ công vị trí ảnh hint cho từng chủ đề
-    if (this.currentTheme === 'BOOK') {
-      // Điều chỉnh vị trí thủ công cho ảnh hint BOOK
-      this.hintImage.setPosition(bx , by-5);
-      this.questionBanner.setScale(0.48, BANNER_SCALE * BOARD_SCALE); // Điều chỉnh kích thước banner cho BOOK
-    } else if (this.currentTheme === 'TREE') {
-      // Điều chỉnh vị trí thủ công cho ảnh hint TREE
-      this.hintImage.setPosition(bx , by-5);
-      this.questionBanner.setScale(0.425, BANNER_SCALE * BOARD_SCALE); // Điều chỉnh kích thước banner cho TREE
-    } else if (this.currentTheme === 'BUILDING') {
-      // Điều chỉnh vị trí thủ công cho ảnh hint BUILDING
-      this.hintImage.setPosition(bx , by-5); // y âm dịch lên
-      this.questionBanner.setScale(0.43, BANNER_SCALE * BOARD_SCALE); // Điều chỉnh kích thước banner cho BUILDING
-    } else if (this.currentTheme === 'ANIMAL') {
-      // Điều chỉnh vị trí thủ công cho ảnh hint BUILDING
-      this.hintImage.setPosition(bx , by-1);
-      this.questionBanner.setScale(0.48, BANNER_SCALE * BOARD_SCALE); // Điều chỉnh kích thước banner cho BOY
-    }else if (this.currentTheme === 'BOY') {
-      // Điều chỉnh vị trí thủ công cho ảnh hint BUILDING
-      this.hintImage.setPosition(bx , by-1);
-      this.questionBanner.setScale(0.42, BANNER_SCALE * BOARD_SCALE); // Điều chỉnh kích thước banner cho BOY
-    }
+    this.positionHintInBanner();
+    this.fitBannerWidthToHint(); // thu ngắn banner theo chữ, không đổi scale chữ
+    this.positionHintInBanner();
     return;
   }
 
   // Nếu không có hint, hiển thị text fallback
   if (this.hintImage) this.hintImage.setVisible(false);
+  this.resetBannerScale();
+  this.promptText.setPosition(this.questionBanner.x, this.questionBanner.y);
+  this.promptText.setWordWrapWidth(this.questionBanner.displayWidth * 0.82, true);
   this.promptText.setVisible(true).setText(fallback);
 }
 
