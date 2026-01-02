@@ -8,6 +8,7 @@ import PreloadScene from "./PreloadScene";
 
 const AUDIO_UNLOCKED_KEY = "__audioUnlocked__";
 const AUDIO_UNLOCKED_EVENT = "audio-unlocked";
+let audioUnlockListenersAttached = false;
 
 function markAudioUnlocked() {
   const win = window as unknown as Record<string, unknown>;
@@ -22,13 +23,18 @@ function unlockAudioFromUserGesture() {
 
 function setupGlobalAudioUnlock() {
   const win = window as unknown as Record<string, unknown>;
+  if (audioUnlockListenersAttached) return;
   if (win[AUDIO_UNLOCKED_KEY]) return;
+  audioUnlockListenersAttached = true;
 
   const handler = () => unlockAudioFromUserGesture();
   (["pointerdown", "touchstart", "mousedown", "keydown"] as const).forEach((ev) => {
     document.addEventListener(ev, handler, { once: true, capture: true } as AddEventListenerOptions);
   });
 }
+
+// Attach as early as possible so a fast "first click" during loading still unlocks audio.
+setupGlobalAudioUnlock();
 
 
 // ================== TẠO CONTAINER GAME ==================
@@ -142,36 +148,35 @@ export function ensureBgmStarted() {
     markAudioUnlocked();
   } catch {}
 
-  (async () => {
-    try {
-      await AudioManager.unlockAndWarmup?.();
-    } catch {}
+  // Kick off audio unlock immediately on the gesture (don’t block starting BGM on awaiting).
+  try {
+    void AudioManager.unlockAndWarmup?.();
+  } catch {}
 
-    try {
-      const startBgm = () => {
-        // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
-        if (!AudioManager.isPlaying("bgm_main")) AudioManager.playWhenReady?.("bgm_main");
+  try {
+    const startBgm = () => {
+      // Chỉ bật nếu chưa phát; để BGM chạy liên tục xuyên suốt các màn
+      if (!AudioManager.isPlaying("bgm_main")) AudioManager.playWhenReady?.("bgm_main");
+    };
+
+    // On some mobile browsers (notably iOS), starting BGM on the first gesture can cut
+    // an in-progress HTML5 voice prompt. When the rotate overlay is active, let the
+    // rotate instruction voice finish first, then start BGM.
+    if ((window as any).__rotateOverlayActive__ && AudioManager.isPlaying("voice_rotate")) {
+      let started = false;
+      const safeStart = () => {
+        if (started) return;
+        started = true;
+        startBgm();
       };
 
-      // On some mobile browsers (notably iOS), starting BGM on the first gesture can cut
-      // an in-progress HTML5 voice prompt. When the rotate overlay is active, let the
-      // rotate instruction voice finish first, then start BGM.
-      if ((window as any).__rotateOverlayActive__ && AudioManager.isPlaying("voice_rotate")) {
-        let started = false;
-        const safeStart = () => {
-          if (started) return;
-          started = true;
-          startBgm();
-        };
-
-        AudioManager.onceEnded?.("voice_rotate", safeStart);
-        // Fallback in case 'end' doesn't fire (e.g. voice was interrupted).
-        setTimeout(safeStart, 4000);
-      } else {
-        startBgm();
-      }
-    } catch {}
-  })();
+      AudioManager.onceEnded?.("voice_rotate", safeStart);
+      // Fallback in case 'end' doesn't fire (e.g. voice was interrupted).
+      setTimeout(safeStart, 4000);
+    } else {
+      startBgm();
+    }
+  } catch {}
 }
 
 
@@ -201,6 +206,7 @@ export function ensureBgmStarted() {
   setRandomGameViewportBg,
   setRandomEndViewportBg,
   setGameButtonsVisible,
+  ensureBgmStarted,
 }));
 
 // ================== CẤU HÌNH PHASER ==================
@@ -290,8 +296,6 @@ function waitForFredoka(): Promise<void> {
 }
 // ================== KHỞI TẠO GAME ==================
 async function initGame() {
-  setupGlobalAudioUnlock();
-
   try {
     await waitForFredoka();
   } catch (e) {
@@ -303,6 +307,11 @@ async function initGame() {
   } catch (e) {
     console.warn("Không load được audio, chạy game luôn.", e);
   }
+  // If the user already clicked/tapped while assets were loading, start BGM now.
+  try {
+    const win = window as unknown as Record<string, unknown>;
+    if (win[AUDIO_UNLOCKED_KEY]) ensureBgmStarted();
+  } catch {}
 
   // Bật nhạc nền 1 lần, loop xuyên suốt game (sau user gesture)
   // setupGlobalBgm();

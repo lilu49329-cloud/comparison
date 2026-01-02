@@ -102,6 +102,15 @@ const GUIDE_HAND_DEPTH = 50;
 const GUIDE_HAND_SCALE = 0.55;
 const GUIDE_HAND_OFFSET_X = -18;
 const GUIDE_HAND_OFFSET_Y = 18;
+const GUIDE_HAND_TAP_SCALE = 0.9;
+const GUIDE_HAND_TAP_DY = 10;
+const GUIDE_HAND_TAP_MS = 120;
+const GUIDE_HAND_DRAG_MS = 850;
+const GUIDE_HAND_PAUSE_MS = 120;
+// Make the hand "push into" the right hole a bit more (visual guidance).
+const GUIDE_HAND_START_DEEPEN_DIST = 64;
+const GUIDE_HAND_END_DEEPEN_DIST = 2;
+const GUIDE_HAND_RETURN_MS = 700;
 
 /* ===================== SCENE ===================== */
 
@@ -139,6 +148,7 @@ export default class GameScene extends Phaser.Scene {
   private audioReady = false;
   private guideHand?: Phaser.GameObjects.Image;
   private guideHandTween?: Phaser.Tweens.Tween;
+  private guideHandSeqId = 0;
   private guideHandMatchKey?: MatchKey;
   private guideHandShownOnce = false;
   private consumePendingInstructionVoice() {
@@ -194,6 +204,14 @@ export default class GameScene extends Phaser.Scene {
   /* ===================== CREATE ===================== */
 
   create() {
+    // Ensure the first interaction inside Phaser can start BGM (some users rotate to landscape
+    // without ever tapping the rotate overlay, so the first real gesture is in-game).
+    this.input.once('pointerdown', () => {
+      try {
+        (window as any).ensureBgmStarted?.();
+      } catch {}
+    });
+
     try {
       (window as unknown as WindowGameApi).setRandomGameViewportBg?.();
     } catch {
@@ -712,29 +730,156 @@ export default class GameScene extends Phaser.Scene {
     const startY = start.y + GUIDE_HAND_OFFSET_Y * s;
     const endX = end.x + GUIDE_HAND_OFFSET_X * s;
     const endY = end.y + GUIDE_HAND_OFFSET_Y * s;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const d = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+    const ux = dx / d;
+    const uy = dy / d;
+    const startXDeep = startX - ux * GUIDE_HAND_START_DEEPEN_DIST * s;
+    const startYDeep = startY - uy * GUIDE_HAND_START_DEEPEN_DIST * s;
+    const endXDeep = endX + ux * GUIDE_HAND_END_DEEPEN_DIST * s;
+    const endYDeep = endY + uy * GUIDE_HAND_END_DEEPEN_DIST * s;
 
     if (restartTween) {
+      this.guideHandSeqId++;
       this.guideHandTween?.stop();
       this.guideHandTween = undefined;
     }
 
     this.guideHand.setPosition(startX, startY).setVisible(true);
 
-    if (!this.guideHandTween) {
-      this.guideHandTween = this.tweens.add({
-        targets: this.guideHand,
-        x: endX,
-        y: endY,
-        duration: 850,
-        yoyo: true,
-        repeat: -1,
-        repeatDelay: 320,
-        ease: 'Sine.inOut',
-      });
-    }
+    if (this.guideHandTween) return;
+
+    const seqId = ++this.guideHandSeqId;
+    const hand = this.guideHand;
+    const baseScale = hand.scaleX;
+    const tapScale = baseScale * GUIDE_HAND_TAP_SCALE;
+    const tapDy = GUIDE_HAND_TAP_DY * baseScale;
+
+    const playCycle = () => {
+      if (!this.guideHand || this.guideHand !== hand) return;
+      if (seqId !== this.guideHandSeqId) return;
+
+      hand.setPosition(startXDeep, startYDeep).setAngle(-8).setVisible(true);
+
+      const tapLeftDown = (onDone: () => void) => {
+        if (seqId !== this.guideHandSeqId) return;
+        this.guideHandTween = this.tweens.add({
+          targets: hand,
+          x: startXDeep,
+          scaleX: tapScale,
+          scaleY: tapScale,
+          y: startYDeep + tapDy,
+          angle: -12,
+          duration: GUIDE_HAND_TAP_MS,
+          ease: 'Sine.out',
+          onComplete: () => tapLeftUp(onDone),
+        });
+      };
+
+      const tapLeftUp = (onDone: () => void) => {
+        if (seqId !== this.guideHandSeqId) return;
+        this.guideHandTween = this.tweens.add({
+          targets: hand,
+          x: startXDeep,
+          scaleX: baseScale,
+          scaleY: baseScale,
+          y: startYDeep,
+          angle: -8,
+          duration: GUIDE_HAND_TAP_MS,
+          ease: 'Sine.in',
+          onComplete: onDone,
+        });
+      };
+
+      const tapStartDown = () => {
+        tapLeftDown(dragToEnd);
+      };
+
+      const dragToEnd = () => {
+        if (seqId !== this.guideHandSeqId) return;
+        this.guideHandTween = this.tweens.add({
+          targets: hand,
+          x: endXDeep,
+          y: endYDeep,
+          angle: -4,
+          duration: GUIDE_HAND_DRAG_MS,
+          ease: 'Sine.inOut',
+          onComplete: tapEndDown,
+        });
+      };
+
+      const tapEndDown = () => {
+        if (seqId !== this.guideHandSeqId) return;
+        this.guideHandTween = this.tweens.add({
+          targets: hand,
+          scaleX: tapScale,
+          scaleY: tapScale,
+          y: endYDeep + tapDy,
+          angle: -10,
+          duration: GUIDE_HAND_TAP_MS,
+          ease: 'Sine.out',
+          onComplete: tapEndUp,
+        });
+      };
+
+      const tapEndUp = () => {
+        if (seqId !== this.guideHandSeqId) return;
+        this.guideHandTween = this.tweens.add({
+          targets: hand,
+          scaleX: baseScale,
+          scaleY: baseScale,
+          y: endYDeep,
+          angle: -8,
+          duration: GUIDE_HAND_TAP_MS,
+          ease: 'Sine.in',
+          onComplete: pauseThenDragBack,
+        });
+      };
+
+      const pauseThenDragBack = () => {
+        if (seqId !== this.guideHandSeqId) return;
+        this.guideHandTween = this.tweens.add({
+          targets: hand,
+          duration: GUIDE_HAND_PAUSE_MS,
+          onComplete: dragBackToStart,
+        });
+      };
+
+      const dragBackToStart = () => {
+        if (seqId !== this.guideHandSeqId) return;
+        this.guideHandTween = this.tweens.add({
+          targets: hand,
+          x: startXDeep,
+          y: startYDeep,
+          angle: -8,
+          duration: GUIDE_HAND_RETURN_MS,
+          ease: 'Sine.inOut',
+          onComplete: tapLeftAfterReturn,
+        });
+      };
+
+      const tapLeftAfterReturn = () => {
+        tapLeftDown(() => tapLeftUp(pauseThenRestart));
+      };
+
+      const pauseThenRestart = () => {
+        if (seqId !== this.guideHandSeqId) return;
+        this.guideHandTween = this.tweens.add({
+          targets: hand,
+          duration: GUIDE_HAND_PAUSE_MS,
+          onComplete: dragToEnd,
+        });
+      };
+
+      tapStartDown();
+    };
+
+    playCycle();
   }
 
   private destroyGuideHand() {
+    this.guideHandSeqId++;
     this.guideHandTween?.stop();
     this.guideHandTween = undefined;
     this.guideHandMatchKey = undefined;

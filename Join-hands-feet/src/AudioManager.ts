@@ -44,6 +44,8 @@ class AudioManager {
   private lastPlayTimes: Record<string, number> = {};
   private dynamicSources: Record<string, string> = {};
   private pendingReadyPlays: Record<string, boolean> = {};
+  private queuedMissingPlays: Record<string, boolean> = {};
+  private queuedUnlockPlays: Record<string, boolean> = {};
 
   private unlocked = false;
   private unlocking = false;
@@ -82,6 +84,13 @@ class AudioManager {
             if (loadedCount === total) resolve();
           },
         });
+
+        // If something requested this sound before `loadAll()` finished (e.g. first click),
+        // start it as soon as the Howl exists / finishes loading.
+        if (this.queuedMissingPlays[key]) {
+          delete this.queuedMissingPlays[key];
+          this.playWhenReady(key);
+        }
       });
     });
   }
@@ -112,6 +121,14 @@ class AudioManager {
       this.unlocked = true;
     } finally {
       this.unlocking = false;
+
+      // Flush any play requests that came in while we were unlocking.
+      // (First user gesture often triggers unlock + BGM start together.)
+      const idsToPlay = Object.keys(this.queuedUnlockPlays);
+      if (idsToPlay.length) {
+        this.queuedUnlockPlays = {};
+        idsToPlay.forEach((id) => this.playWhenReady(id));
+      }
     }
   }
 
@@ -141,7 +158,6 @@ class AudioManager {
         return;
       }
 
-      sound.off('load');
       sound.once('load', () => doPlaySilent());
 
       if (state === 'unloaded') sound.load();
@@ -149,7 +165,10 @@ class AudioManager {
   }
 
   play(id: string): number | undefined {
-    if (this.unlocking) return;
+    if (this.unlocking) {
+      this.queuedUnlockPlays[id] = true;
+      return;
+    }
 
     const now = Date.now();
     const cooldown = this.getCooldown(id);
@@ -173,11 +192,16 @@ class AudioManager {
   }
 
   playWhenReady(id: string): void {
-    if (this.unlocking) return;
+    if (this.unlocking) {
+      this.queuedUnlockPlays[id] = true;
+      return;
+    }
 
     const sound = this.sounds[id];
     if (!sound) {
-      console.warn(`[AudioManager] Sound ID not found: ${id}`);
+      // The sound may not exist yet if `loadAll()` is still in progress.
+      // Queue this request so it can start once the Howl is created.
+      this.queuedMissingPlays[id] = true;
       return;
     }
 
@@ -190,7 +214,6 @@ class AudioManager {
     if (this.pendingReadyPlays[id]) return;
     this.pendingReadyPlays[id] = true;
 
-    sound.off('load');
     sound.once('load', () => {
       this.pendingReadyPlays[id] = false;
       this.play(id);
@@ -219,7 +242,10 @@ class AudioManager {
   }
 
   playFromUrl(id: string, src: string, opts?: { loop?: boolean; volume?: number; html5?: boolean }): number | undefined {
-    if (this.unlocking) return;
+    if (this.unlocking) {
+      this.queuedUnlockPlays[id] = true;
+      return;
+    }
 
     const now = Date.now();
     const cooldown = this.getCooldown(id);
