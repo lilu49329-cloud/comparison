@@ -103,6 +103,9 @@ export default class EndGameScene extends Phaser.Scene {
             this.scene.start('GameScene', {
                 lessonId: this.lessonId,
                 difficulty: this.difficulty,
+                levelIndex: 0,
+                score: 0,
+                regenLevels: true,
             });
             // Bật lại BGM sau khi chơi lại
             ensureBgmStarted();

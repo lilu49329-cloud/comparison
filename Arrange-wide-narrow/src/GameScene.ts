@@ -5,6 +5,7 @@ import AudioManager from './AudioManager';
 const AUDIO_UNLOCKED_KEY = '__audioUnlocked__';
 const AUDIO_UNLOCKED_EVENT = 'audio-unlocked';
 const SORT_LEVELS_KEY = '__sortHeightLevels__';
+const SORT_LAST_THEME_KEY = '__sortLastTheme__';
 
 /* ===================== TYPES ===================== */
 
@@ -289,31 +290,46 @@ export default class GameScene extends Phaser.Scene {
 
     // If caller wants "random but not same theme as before", bump to another level if needed.
     if (data.avoidTheme && this.levels.length > 1) {
-      const currentTheme = this.levels[this.levelIndex]?.theme;
-      if (currentTheme === data.avoidTheme) {
-        const altIndex = this.levels.findIndex((lvl) => lvl.theme !== data.avoidTheme);
-        if (altIndex >= 0) this.levelIndex = altIndex;
+      if (requestedLevelIndex === 0) {
+        if (this.levels[0]?.theme === data.avoidTheme) {
+          const swapIndex = this.levels.findIndex((lvl) => lvl.theme !== data.avoidTheme);
+          if (swapIndex > 0) {
+            const tmp = this.levels[0];
+            this.levels[0] = this.levels[swapIndex];
+            this.levels[swapIndex] = tmp;
+            win[SORT_LEVELS_KEY] = { levels: this.levels };
+          }
+        }
+      } else {
+        const currentTheme = this.levels[this.levelIndex]?.theme;
+        if (currentTheme === data.avoidTheme) {
+          const altIndex = this.levels.findIndex((lvl) => lvl.theme !== data.avoidTheme);
+          if (altIndex >= 0) this.levelIndex = altIndex;
+        }
       }
     }
 
     this.level = this.levelIndex;
+    win[SORT_LAST_THEME_KEY] = this.levels[this.levelIndex]?.theme;
   }
 
   /* ===================== LEVEL GENERATION ===================== */
   private generateLevels(numLevels: number): SortLevelConfig[] {
     const direction: SortDirection = 'ASC';
-    // Fixed order: ROAD first, then BRIDGE (so subgame mapping stays consistent).
     const themes = SORT_THEMES.map((x) => x.id);
+
+    const themeSequence: SortThemeId[] = [];
+    for (let i = 0; i < numLevels; i++) {
+      const prev = themeSequence[i - 1];
+      const pool = prev && themes.length > 1 ? themes.filter((t) => t !== prev) : themes;
+      themeSequence.push(Phaser.Utils.Array.GetRandom(pool));
+    }
 
     return Array.from({ length: numLevels }, (_, i) => ({
       id: i + 1,
       direction,
-      theme: themes[i % themes.length],
-      itemIds: [
-        makeItemId(themes[i % themes.length], 1),
-        makeItemId(themes[i % themes.length], 2),
-        makeItemId(themes[i % themes.length], 3),
-      ],
+      theme: themeSequence[i]!,
+      itemIds: (Phaser.Utils.Array.Shuffle([1, 2, 3]) as SortVariant[]).map((v) => makeItemId(themeSequence[i]!, v)),
     }));
   }
 

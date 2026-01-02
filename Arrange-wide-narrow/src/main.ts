@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 //import OverlayScene from "./OverlayScene";
-import GameScene, { MAIN_LEVEL_COUNT } from "./GameScene";
+import GameScene from "./GameScene";
 import EndGameScene from "./EndGameScene";
 import AudioManager from "./AudioManager";
 import { initRotateOrientation } from "./rotateOrientation";
@@ -215,7 +215,8 @@ function setupHtmlButtons() {
   const replayBtn = document.getElementById("btn-replay");
   if (replayBtn) {
     replayBtn.addEventListener("click", () => {
-      if (!game) return;
+      const g = game;
+      if (!g) return;
 
       // ✅ unlock audio ngay trên thao tác click DOM (đảm bảo voice/BGM không bị "đợi chơi lại")
       unlockAudioFromUserGesture();
@@ -223,64 +224,40 @@ function setupHtmlButtons() {
       // Dừng toàn bộ âm thanh trước khi chơi lại để tránh lồng nhau
       AudioManager.stopAll();
 
-      const gameScene = game.scene.getScene("GameScene") as GameScene | null;
-      const levelCount = Math.max(1, MAIN_LEVEL_COUNT);
-      const currentMainTheme = (gameScene?.levels?.[gameScene.levelIndex] as any)?.theme as string | undefined;
+      const restartFromBeginning = () => {
+        const win = window as any;
+        const avoidTheme = win?.__sortLastTheme__ as any;
 
-      const pickNextLevelIndex = (currentIndex: number, count: number) => {
-        if (count <= 1) return 0;
-        const normalized = Math.max(0, Math.min(currentIndex, count - 1));
-        let next = normalized;
-        for (let tries = 0; tries < 10 && next === normalized; tries++) {
-          next = Math.floor(Math.random() * count);
-        }
-        if (next === normalized) next = (normalized + 1) % count;
-        return next;
-      };
+        g.scene.stop("BalanceScene");
+        g.scene.stop("EndGameScene");
+        g.scene.stop("GameScene");
 
-      // Nếu đang ở màn phụ → dừng màn phụ và quay lại GameScene (random, không trùng màn trước)
-      const balance = game.scene.getScene("BalanceScene") as BalanceScene | null;
-      if (balance && balance.scene.isActive()) {
-        const score = balance.score ?? 0;
-        const nextLevelIndex = pickNextLevelIndex(balance.levelIndex ?? 0, levelCount);
-
-        game.scene.stop("BalanceScene");
-        game.scene.start("GameScene", {
-          levelIndex: nextLevelIndex,
-          score,
-          regenLevels: true,
-          avoidTheme: currentMainTheme,
-        } as any);
-        ensureBgmStarted();
-        return;
-      }
-
-      // Nếu đang ở EndGame → chơi lại random
-      const end = game.scene.getScene("EndGameScene") as EndGameScene | null;
-      if (end && end.scene.isActive()) {
-        const nextLevelIndex = pickNextLevelIndex(0, levelCount);
-        game.scene.stop("EndGameScene");
-        game.scene.start("GameScene", {
-          levelIndex: nextLevelIndex,
+        g.scene.start("GameScene", {
+          levelIndex: 0,
           score: 0,
           regenLevels: true,
-          avoidTheme: currentMainTheme,
+          avoidTheme,
         } as any);
+
         ensureBgmStarted();
+      };
+
+      // Chơi lại = quay về từ đầu, giữ đủ số level (không nhảy random làm hụt lần chơi).
+      const balance = g.scene.getScene("BalanceScene") as BalanceScene | null;
+      if (balance && balance.scene.isActive()) {
+        restartFromBeginning();
         return;
       }
 
-      // Ngược lại, đang ở GameScene → chuyển sang level random (không trùng level/theme trước)
-      const scene = game.scene.getScene("GameScene") as GameScene | null;
-      if (!scene) return;
-      const nextLevelIndex = pickNextLevelIndex(scene.levelIndex, levelCount);
-      game.scene.start("GameScene", {
-        levelIndex: nextLevelIndex,
-        score: scene.score,
-        regenLevels: true,
-        avoidTheme: currentMainTheme,
-      } as any);
-      ensureBgmStarted();
+      // Nếu đang ở EndGame → chơi lại từ đầu
+      const end = g.scene.getScene("EndGameScene") as EndGameScene | null;
+      if (end && end.scene.isActive()) {
+        restartFromBeginning();
+        return;
+      }
+
+      // Ngược lại, đang ở GameScene → reset lại từ đầu
+      restartFromBeginning();
     });
   }
 
