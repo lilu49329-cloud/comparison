@@ -151,6 +151,8 @@ export default class GameScene extends Phaser.Scene {
   private guideHandSeqId = 0;
   private guideHandMatchKey?: MatchKey;
   private guideHandShownOnce = false;
+  private guideHandTimer?: Phaser.Time.TimerEvent;
+  private roundInteracted = false;
   private consumePendingInstructionVoice() {
     try {
       const win = window as any;
@@ -194,8 +196,10 @@ export default class GameScene extends Phaser.Scene {
     this.wrongLine = undefined;
     this.wrongLineSeg = undefined;
     this.gameState = 'INTRO';
+    this.cancelGuideHandSchedule();
     this.destroyGuideHand();
     this.guideHandShownOnce = false;
+    this.roundInteracted = false;
 
     const win = window as unknown as Record<string, unknown>;
     this.audioReady = !!win[AUDIO_UNLOCKED_KEY];
@@ -384,6 +388,8 @@ export default class GameScene extends Phaser.Scene {
 
     this.input.on('dragstart', (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject) => {
       AudioManager.stop('voice_join');
+      this.roundInteracted = true;
+      this.cancelGuideHandSchedule();
       this.destroyGuideHand();
       const img = gameObject as Phaser.GameObjects.Image;
       const matchKey = img.getData('matchKey') as MatchKey | undefined;
@@ -668,6 +674,8 @@ export default class GameScene extends Phaser.Scene {
     this.resetUiForNewTry();
     this.playInstructionVoice();
     this.gameState = 'INTRO';
+    this.roundInteracted = false;
+    this.cancelGuideHandSchedule();
     this.scheduleGuideHand();
   }
 
@@ -675,11 +683,14 @@ export default class GameScene extends Phaser.Scene {
     if (this.guideHandShownOnce) return;
     if (!this.textures.exists(GUIDE_HAND_KEY)) return;
 
-    this.time.delayedCall(450, () => {
+    this.cancelGuideHandSchedule();
+    this.guideHandTimer = this.time.delayedCall(450, () => {
       if (!this.scene.isActive()) return;
       if (this.guideHandShownOnce) return;
+      if (this.roundInteracted) return;
       if (this.matched.size > 0) return;
-      if (this.gameState === 'LEVEL_END') return;
+      if (this.gameState !== 'INTRO') return;
+      if (this.draggingKey) return;
       this.startGuideHand();
     });
   }
@@ -687,6 +698,7 @@ export default class GameScene extends Phaser.Scene {
   private startGuideHand() {
     if (this.guideHandShownOnce) return;
     if (!this.textures.exists(GUIDE_HAND_KEY)) return;
+    if (this.roundInteracted) return;
 
     const matchKey = this.leftOrder[0] ?? (this.leftItems[0]?.getData('matchKey') as MatchKey | undefined);
     if (!matchKey) return;
@@ -709,9 +721,6 @@ export default class GameScene extends Phaser.Scene {
 
     this.guideHand.setAlpha(0.95).setScale(scale).setAngle(-8);
     this.refreshGuideHand(true);
-
-    // Dismiss as soon as the kid touches/starts dragging.
-    this.input.once('pointerdown', () => this.destroyGuideHand());
   }
 
   private refreshGuideHand(restartTween = false) {
@@ -885,6 +894,12 @@ export default class GameScene extends Phaser.Scene {
     this.guideHandMatchKey = undefined;
     this.guideHand?.destroy();
     this.guideHand = undefined;
+  }
+
+  private cancelGuideHandSchedule() {
+    if (!this.guideHandTimer) return;
+    this.time.removeEvent(this.guideHandTimer);
+    this.guideHandTimer = undefined;
   }
 
   private updateHintForRound() {
